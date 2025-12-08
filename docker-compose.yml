@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # Backend
+  backend:
+    # Wskazujemy nową ścieżkę do folderu z plikami Flaska
+    build: ./backend/server
+    container_name: travel_planner_backend
+    ports:
+      - "5001:5001"
+    volumes:
+      # Mapujemy kod z nowej lokalizacji do kontenera
+      - ./backend/server:/app
+    environment:
+      - FLASK_ENV=development
+
+  # Frontend
+  frontend:
+    # Tu zakładam, że przesunąłeś Dockerfile do folderu 'client'
+    build: ./frontend/client
+    container_name: travel_planner_frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mapujemy kod z folderu client
+      - ./frontend/client:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    environment:
+      - WATCHPACK_POLLING=true
