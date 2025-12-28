@@ -12,7 +12,7 @@ const mockTrips = [
     image: 'bg-gradient-to-br from-green-400 to-blue-500', // Uproszczone tło zamiast zdjęcia
     packingList: [
       { id: 1, item: 'Kurtka przeciwdeszczowa', checked: false },
-      { id: 2, item: 'Buty trekkingowe', checked: true },
+      { id: 2, item: 'Buty trekkingowe', checked: false },
       { id: 3, item: 'Powerbank', checked: false },
       { id: 4, item: 'Gotówka (na schroniska)', checked: false },
     ],
@@ -34,7 +34,7 @@ const mockTrips = [
     description: 'Zwiedzanie Gdańska, Sopotu i Gdyni.',
     image: 'bg-gradient-to-br from-blue-400 to-indigo-600',
     packingList: [
-      { id: 1, item: 'Okulary przeciwsłoneczne', checked: true },
+      { id: 1, item: 'Okulary przeciwsłoneczne', checked: false },
       { id: 2, item: 'Krem z filtrem', checked: false },
       { id: 3, item: 'Strój kąpielowy', checked: false },
     ],
@@ -54,6 +54,65 @@ const mockTrips = [
 export default function Dashboard() {
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [activeTab, setActiveTab] = useState('harmonogram'); // harmonogram | pakowanie | atrakcje
+  const API_BASE = 'http://localhost:5001';
+
+  const togglePacking = async (id) => {
+    // optimistic update
+    let newChecked = false;
+    setSelectedTrip((prev) => {
+      if (!prev) return prev;
+      const newPacking = prev.packingList.map((it) => {
+        if (it.id === id) {
+          newChecked = !it.is_checked && !it.checked ? true : !it.is_checked && it.checked === undefined ? !it.checked : !it.is_checked;
+          // support both legacy `checked` and persisted `is_checked`
+          return { ...it, is_checked: !(it.is_checked || it.checked) };
+        }
+        return it;
+      });
+      return { ...prev, packingList: newPacking };
+    });
+
+    try {
+      const item = selectedTrip?.packingList?.find((p) => p.id === id);
+      if (!item) return;
+      // Ensure we reference the id from persisted items
+      await fetch(`${API_BASE}/api/packing/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_checked: !(item.is_checked || item.checked) })
+      });
+    } catch (err) {
+      console.error('Failed to persist packing toggle', err);
+    }
+  };
+
+  const loadPacking = async (trip) => {
+    const USER_ID = 1; // temporary static user id
+    try {
+      const res = await fetch(`${API_BASE}/api/packing?trip_id=${trip.id}&user_id=${USER_ID}`);
+      if (!res.ok) throw new Error('Failed to load packing items');
+      const items = await res.json();
+      if (items && items.length > 0) {
+        setSelectedTrip({ ...trip, packingList: items });
+        return;
+      }
+      // if backend has no items yet, create them from mock trip
+      const created = [];
+      for (const it of trip.packingList) {
+        const r = await fetch(`${API_BASE}/api/packing`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trip_id: trip.id, user_id: USER_ID, item_name: it.item, is_checked: it.checked ? 1 : 0 })
+        });
+        if (r.ok) created.push(await r.json());
+      }
+      setSelectedTrip({ ...trip, packingList: created });
+    } catch (err) {
+      console.error('Error loading/creating packing items:', err);
+      // fallback to local mock data
+      setSelectedTrip(JSON.parse(JSON.stringify(trip)));
+    }
+  };
 
   // --- WIDOK 1: LISTA PODRÓŻY (DASHBOARD GŁÓWNY) ---
   if (!selectedTrip) {
@@ -73,7 +132,7 @@ export default function Dashboard() {
           {mockTrips.map((trip) => (
             <div 
               key={trip.id}
-              onClick={() => setSelectedTrip(trip)}
+              onClick={() => loadPacking(trip)}
               className="bg-white rounded-xl shadow-sm hover:shadow-md transition cursor-pointer border border-gray-100 overflow-hidden group"
             >
               {/* Kolorowy nagłówek karty (zamiast zdjęcia) */}
@@ -174,11 +233,12 @@ export default function Dashboard() {
                   <li key={item.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition">
                     <input 
                       type="checkbox" 
-                      defaultChecked={item.checked}
+                      checked={!!(item.is_checked ?? item.checked)}
+                      onChange={() => togglePacking(item.id)}
                       className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500" 
                     />
-                    <span className={item.checked ? "text-gray-400 line-through" : "text-gray-700"}>
-                      {item.item}
+                    <span className={(item.is_checked ?? item.checked) ? "text-gray-400 line-through" : "text-gray-700"}>
+                      {item.item_name ?? item.item}
                     </span>
                   </li>
                 ))}
