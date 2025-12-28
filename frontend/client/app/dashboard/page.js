@@ -12,7 +12,7 @@ const mockTrips = [
     image: 'bg-gradient-to-br from-green-400 to-blue-500', // Uproszczone tło zamiast zdjęcia
     packingList: [
       { id: 1, item: 'Kurtka przeciwdeszczowa', checked: false },
-      { id: 2, item: 'Buty trekkingowe', checked: true },
+      { id: 2, item: 'Buty trekkingowe', checked: false },
       { id: 3, item: 'Powerbank', checked: false },
       { id: 4, item: 'Gotówka (na schroniska)', checked: false },
     ],
@@ -34,7 +34,7 @@ const mockTrips = [
     description: 'Zwiedzanie Gdańska, Sopotu i Gdyni.',
     image: 'bg-gradient-to-br from-blue-400 to-indigo-600',
     packingList: [
-      { id: 1, item: 'Okulary przeciwsłoneczne', checked: true },
+      { id: 1, item: 'Okulary przeciwsłoneczne', checked: false },
       { id: 2, item: 'Krem z filtrem', checked: false },
       { id: 3, item: 'Strój kąpielowy', checked: false },
     ],
@@ -55,6 +55,16 @@ export default function Dashboard() {
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [activeTab, setActiveTab] = useState('harmonogram'); // harmonogram | pakowanie | atrakcje
 
+  const togglePacking = (id) => {
+    setSelectedTrip((prev) => {
+      if (!prev) return prev;
+      const newPacking = prev.packingList.map((it) =>
+        it.id === id ? { ...it, checked: !it.checked } : it
+      );
+      return { ...prev, packingList: newPacking };
+    });
+  };
+
   // --- WIDOK 1: LISTA PODRÓŻY (DASHBOARD GŁÓWNY) ---
   if (!selectedTrip) {
     return (
@@ -73,7 +83,7 @@ export default function Dashboard() {
           {mockTrips.map((trip) => (
             <div 
               key={trip.id}
-              onClick={() => setSelectedTrip(trip)}
+              onClick={() => setSelectedTrip(JSON.parse(JSON.stringify(trip)))}
               className="bg-white rounded-xl shadow-sm hover:shadow-md transition cursor-pointer border border-gray-100 overflow-hidden group"
             >
               {/* Kolorowy nagłówek karty (zamiast zdjęcia) */}
@@ -174,7 +184,8 @@ export default function Dashboard() {
                   <li key={item.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition">
                     <input 
                       type="checkbox" 
-                      defaultChecked={item.checked}
+                      checked={!!item.checked}
+                      onChange={() => togglePacking(item.id)}
                       className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500" 
                     />
                     <span className={item.checked ? "text-gray-400 line-through" : "text-gray-700"}>
