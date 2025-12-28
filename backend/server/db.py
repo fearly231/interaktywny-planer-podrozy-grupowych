@@ -54,6 +54,17 @@ class Database:
                 )
             ''')
 
+            # tabela przechowująca elementy listy pakowania (PackingItem)
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS packing_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    trip_id INTEGER,
+                    user_id INTEGER,
+                    item_name TEXT,
+                    is_checked INTEGER DEFAULT 0
+                )
+            ''')
+
             cur.execute("SELECT * FROM users WHERE username = ?", ('podroznik',))
             if cur.fetchone() is None:
                 cur.execute("INSERT INTO users (username, password) VALUES (?, ?)", ('podroznik', '1234'))
