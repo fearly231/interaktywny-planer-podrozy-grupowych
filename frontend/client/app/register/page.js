@@ -1,32 +1,29 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
-export default function LoginPage() {
+export default function Registration() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const router = useRouter();
+  const [success, setSuccess] = useState('');
 
-  const handleLogin = async (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
-
+    setSuccess('');
     try {
-      const res = await fetch('http://localhost:5001/api/login', {
+      const res = await fetch('http://localhost:5001/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-
       const data = await res.json();
-
       if (res.ok) {
-        // Zapisujemy token (opcjonalnie) i przekierowujemy
-        localStorage.setItem('token', data.token);
-        router.push('/dashboard');
+        setSuccess('Rejestracja udana! Możesz się zalogować.');
+        setUsername('');
+        setPassword('');
       } else {
-        setError(data.message || 'Błąd logowania');
+        setError(data.message || 'Błąd rejestracji');
       }
     } catch (err) {
       setError('Błąd połączenia z serwerem');
@@ -36,11 +33,10 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-blue-50">
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
-        <h1 className="text-2xl font-bold text-center text-blue-600 mb-6">Travel Planner 🌍</h1>
-        
-        <form onSubmit={handleLogin} className="space-y-4">
+        <h1 className="text-2xl font-bold text-center text-blue-600 mb-6">Rejestracja</h1>
+        <form onSubmit={handleRegister} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Użytkownik (podroznik)</label>
+            <label className="block text-sm font-medium text-gray-700">Nazwa użytkownika</label>
             <input
               type="text"
               value={username}
@@ -50,7 +46,7 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Hasło (1234)</label>
+            <label className="block text-sm font-medium text-gray-700">Hasło</label>
             <input
               type="password"
               value={password}
@@ -59,23 +55,15 @@ export default function LoginPage() {
               required
             />
           </div>
-          
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-          
+          {success && <p className="text-green-600 text-sm text-center">{success}</p>}
           <button
             type="submit"
             className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition duration-200"
           >
-            Zaloguj się
+            Zarejestruj się
           </button>
         </form>
-        <button
-          type="button"
-          className="w-full mt-4 py-2 px-4 bg-gray-200 hover:bg-gray-300 text-blue-700 font-semibold rounded-md transition duration-200"
-          onClick={() => router.push('/register')}
-        >
-          Zarejestruj się
-        </button>
       </div>
     </div>
   );

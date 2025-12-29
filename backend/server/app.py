@@ -1,6 +1,8 @@
 # backend/server/app.py
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+import jwt
+import datetime
 
 # Importujemy nasze funkcje z nowego pliku db.py
 
@@ -16,6 +18,8 @@ CORS(app)
 # Zamiast starego init_db()
 Database()
 
+SECRET_KEY = 'supersekretnykluczjwt'  # w produkcji ustaw przez ENV!
+
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
@@ -29,19 +33,39 @@ def login():
     try:
         # Wykonujemy zapytanie
         user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
-        
         # WAŻNE: USUNĘLIŚMY conn.close() - Singleton trzyma połączenie otwarte!
 
         if user and user['password'] == password:
+            # Generujemy token JWT
+            token = jwt.encode({
+                'username': user['username'],
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
+            }, SECRET_KEY, algorithm='HS256')
             return jsonify({
                 "status": "success",
-                "token": "fake-jwt-token-123",
+                "token": token,
                 "user": user['username']
             }), 200
         else:
             return jsonify({"status": "error", "message": "Błędne dane logowania"}), 401
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    
+@app.route('/api/register', methods=['POST'])
+def register_user():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    if not username or not password:
+        return jsonify({"status": "error", "message": "Brak nazwy użytkownika lub hasła"}), 400
+    db = Database()
+    conn = db.get_connection()
+    try:
+        conn.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
+        conn.commit()
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    return jsonify({"status": "success"}), 201
 
 @app.route('/api/data', methods=['GET'])
 def get_dashboard_data():

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import TripDetails from './TripDetails';
 
 // --- MOCK DATA (DANE PRZYKŁADOWE) ---
@@ -27,6 +28,17 @@ const mockTrips = [
 ];
 
 export default function Dashboard() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.replace('/');
+      }
+    }
+  }, [router]);
+
   // 1. STAN: Trzymamy tylko ID wybranej wycieczki
   const [selectedTripId, setSelectedTripId] = useState(null);
   const [activeTab, setActiveTab] = useState('harmonogram');
@@ -126,9 +138,20 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold text-gray-800">Moje Podróże 🌍</h1>
             <p className="text-gray-500">Wybierz wyjazd, aby zobaczyć szczegóły</p>
           </div>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition">
-            + Nowa Podróż
-          </button>
+          <div className="flex gap-2">
+            <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition">
+              + Nowa Podróż
+            </button>
+            <button
+              className="bg-gray-200 hover:bg-gray-300 text-blue-700 px-4 py-2 rounded-lg shadow transition font-semibold"
+              onClick={() => {
+                localStorage.removeItem('token');
+                router.replace('/');
+              }}
+            >
+              Wyloguj się
+            </button>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -167,13 +190,31 @@ export default function Dashboard() {
   if (!selectedTrip) return <div>Nie znaleziono wycieczki.</div>;
 
   return (
-    <TripDetails 
-      selectedTrip={selectedTrip}
-      activeTab={activeTab}
-      setActiveTab={setActiveTab}
-      setSelectedTrip={() => setSelectedTripId(null)}
-      handleVote={handleVote}
-      togglePacking={togglePacking}
-    />
+    <>
+      <div className="min-h-screen bg-gray-50 p-8">
+        <header className="mb-10 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800">Szczegóły podróży</h1>
+          </div>
+          <button
+            className="bg-gray-200 hover:bg-gray-300 text-blue-700 px-4 py-2 rounded-lg shadow transition font-semibold"
+            onClick={() => {
+              localStorage.removeItem('token');
+              router.replace('/');
+            }}
+          >
+            Wyloguj się
+          </button>
+        </header>
+        <TripDetails 
+          selectedTrip={selectedTrip}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          setSelectedTrip={() => setSelectedTripId(null)}
+          handleVote={handleVote}
+          togglePacking={togglePacking}
+        />
+      </div>
+    </>
   );
 }
