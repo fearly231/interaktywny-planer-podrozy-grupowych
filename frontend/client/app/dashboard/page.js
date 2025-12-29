@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [selectedTripId, setSelectedTripId] = useState(null);
   const [activeTab, setActiveTab] = useState('harmonogram');
   const [trips, setTrips] = useState(mockTrips);
+  const API_BASE = 'http://localhost:5001';
 
   // 2. EFEKT: Pobranie danych z backendu (żeby nadpisać mocki)
   useEffect(() => {
@@ -47,8 +48,6 @@ export default function Dashboard() {
     })
     .then(res => res.json())
     .then(updatedAttraction => {
-        console.log("Nowy stan atrakcji:", updatedAttraction);
-        
         setTrips(prevTrips => prevTrips.map(trip => {
             if (trip.id !== tripId) return trip;
             return {
@@ -60,65 +59,35 @@ export default function Dashboard() {
         }));
     })
     .catch(err => console.error("Błąd głosowania:", err));
-  {
-    id: 2,
-    title: 'City Break Trójmiasto 🌊',
-    date: '10-12 Lipca',
-    description: 'Zwiedzanie Gdańska, Sopotu i Gdyni.',
-    image: 'bg-gradient-to-br from-blue-400 to-indigo-600',
-    packingList: [
-      { id: 1, item: 'Okulary przeciwsłoneczne', checked: false },
-      { id: 2, item: 'Krem z filtrem', checked: false },
-      { id: 3, item: 'Strój kąpielowy', checked: false },
-    ],
-    attractions: [
-      { id: 1, name: 'Muzeum II Wojny Światowej', type: 'Muzeum', note: 'Rezerwacja biletów online' },
-      { id: 2, name: 'Molo w Sopocie', type: 'Spacer', note: 'Lody na monciaku' },
-      { id: 3, name: 'Akwarium Gdyńskie', type: 'Edukacja', note: '' },
-    ],
-    schedule: [
-      { time: '10:00', activity: 'Spacer po Starówce' },
-      { time: '14:00', activity: 'Rejs statkiem' },
-      { time: '20:00', activity: 'Impreza w Sopocie' },
-    ]
-  }
-];
+  };
 
-export default function Dashboard() {
-  const [selectedTrip, setSelectedTrip] = useState(null);
-  const [activeTab, setActiveTab] = useState('harmonogram'); // harmonogram | pakowanie | atrakcje
-  const API_BASE = 'http://localhost:5001';
-
-  const togglePacking = async (id) => {
-    // optimistic update
-    let newChecked = false;
-    setSelectedTrip((prev) => {
-      if (!prev) return prev;
-      const newPacking = prev.packingList.map((it) => {
-        if (it.id === id) {
-          newChecked = !it.is_checked && !it.checked ? true : !it.is_checked && it.checked === undefined ? !it.checked : !it.is_checked;
-          // support both legacy `checked` and persisted `is_checked`
-          return { ...it, is_checked: !(it.is_checked || it.checked) };
+  // --- OBSŁUGA PAKOWANIA ---
+  const togglePacking = async (itemId) => {
+    setTrips(prevTrips => prevTrips.map(trip => {
+      if (trip.id !== selectedTripId) return trip;
+      const newPacking = trip.packingList.map((it) => {
+        if (it.id === itemId) {
+          return { ...it, is_checked: !(it.is_checked ?? it.checked) };
         }
         return it;
       });
-      return { ...prev, packingList: newPacking };
-    });
-
+      return { ...trip, packingList: newPacking };
+    }));
     try {
-      const item = selectedTrip?.packingList?.find((p) => p.id === id);
+      const trip = trips.find(t => t.id === selectedTripId);
+      const item = trip?.packingList?.find((p) => p.id === itemId);
       if (!item) return;
-      // Ensure we reference the id from persisted items
-      await fetch(`${API_BASE}/api/packing/${id}`, {
+      await fetch(`${API_BASE}/api/packing/${itemId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_checked: !(item.is_checked || item.checked) })
+        body: JSON.stringify({ is_checked: !(item.is_checked ?? item.checked) })
       });
     } catch (err) {
       console.error('Failed to persist packing toggle', err);
     }
   };
 
+  // Ładowanie listy pakowania z backendu lub tworzenie jej jeśli nie istnieje
   const loadPacking = async (trip) => {
     const USER_ID = 1; // temporary static user id
     try {
@@ -126,7 +95,8 @@ export default function Dashboard() {
       if (!res.ok) throw new Error('Failed to load packing items');
       const items = await res.json();
       if (items && items.length > 0) {
-        setSelectedTrip({ ...trip, packingList: items });
+        setTrips(prevTrips => prevTrips.map(t => t.id === trip.id ? { ...trip, packingList: items } : t));
+        setSelectedTripId(trip.id);
         return;
       }
       // if backend has no items yet, create them from mock trip
@@ -139,16 +109,15 @@ export default function Dashboard() {
         });
         if (r.ok) created.push(await r.json());
       }
-      setSelectedTrip({ ...trip, packingList: created });
+      setTrips(prevTrips => prevTrips.map(t => t.id === trip.id ? { ...trip, packingList: created } : t));
+      setSelectedTripId(trip.id);
     } catch (err) {
       console.error('Error loading/creating packing items:', err);
-      // fallback to local mock data
-      setSelectedTrip(JSON.parse(JSON.stringify(trip)));
+      setSelectedTripId(trip.id);
     }
   };
 
   // --- WIDOK 1: LISTA PODRÓŻY (DASHBOARD GŁÓWNY) ---
-  // Sprawdzamy ID, a nie obiekt
   if (!selectedTripId) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
@@ -166,8 +135,6 @@ export default function Dashboard() {
           {trips.map((trip) => (
             <div 
               key={trip.id}
-              // POPRAWKA: Ustawiamy ID, a nie obiekt
-              onClick={() => setSelectedTripId(trip.id)}
               onClick={() => loadPacking(trip)}
               className="bg-white rounded-xl shadow-sm hover:shadow-md transition cursor-pointer border border-gray-100 overflow-hidden group"
             >
@@ -195,87 +162,18 @@ export default function Dashboard() {
   }
 
   // --- WIDOK 2: SZCZEGÓŁY PODRÓŻY ---
-  
   // KLUCZOWY MOMENT: Znajdujemy aktualną wersję wycieczki na podstawie ID
-  // Dzięki temu, gdy `trips` się zmieni (po głosowaniu), `selectedTrip` też się odświeży.
   const selectedTrip = trips.find(t => t.id === selectedTripId);
-
-  // Zabezpieczenie (gdyby ID było niepoprawne)
   if (!selectedTrip) return <div>Nie znaleziono wycieczki.</div>;
 
   return (
     <TripDetails 
-      selectedTrip={selectedTrip} // Przekazujemy "żywą" wersję
-      activeTab={activeTab} 
-      setActiveTab={setActiveTab} 
-      // Przekazujemy funkcję resetującą ID (powrót do listy)
-      setSelectedTrip={() => setSelectedTripId(null)} 
+      selectedTrip={selectedTrip}
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      setSelectedTrip={() => setSelectedTripId(null)}
       handleVote={handleVote}
+      togglePacking={togglePacking}
     />
-        {/* Treść Zakładek */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[400px]">
-          
-          {activeTab === 'harmonogram' && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-bold text-gray-800 mb-4">Plan Dnia</h2>
-              <div className="relative border-l-2 border-blue-100 ml-3 space-y-8">
-                {selectedTrip.schedule.map((item, idx) => (
-                  <div key={idx} className="relative pl-8">
-                    <span className="absolute -left-[9px] top-1 w-4 h-4 bg-blue-500 rounded-full border-4 border-white ring-1 ring-blue-100"></span>
-                    <span className="block text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">
-                      {item.time}
-                    </span>
-                    <p className="text-gray-700 text-lg">{item.activity}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'pakowanie' && (
-            <div>
-              <h2 className="text-lg font-bold text-gray-800 mb-4">Co zabrać?</h2>
-              <ul className="space-y-3">
-                {selectedTrip.packingList.map((item) => (
-                  <li key={item.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition">
-                    <input 
-                      type="checkbox" 
-                      checked={!!(item.is_checked ?? item.checked)}
-                      onChange={() => togglePacking(item.id)}
-                      className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500" 
-                    />
-                    <span className={(item.is_checked ?? item.checked) ? "text-gray-400 line-through" : "text-gray-700"}>
-                      {item.item_name ?? item.item}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {activeTab === 'atrakcje' && (
-            <div>
-              <h2 className="text-lg font-bold text-gray-800 mb-4">Miejsca do odwiedzenia</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedTrip.attractions.map((place) => (
-                  <div key={place.id} className="border border-gray-200 p-4 rounded-xl hover:border-blue-300 transition bg-gray-50/50">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-semibold text-gray-800">{place.name}</h3>
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                        {place.type}
-                      </span>
-                    </div>
-                    {place.note && (
-                      <p className="text-sm text-gray-500 italic">"{place.note}"</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-        </div>
-      </main>
-    </div>
   );
 }
