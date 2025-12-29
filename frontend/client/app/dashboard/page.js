@@ -1,15 +1,16 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import TripDetails from './TripDetails';
 
 // --- MOCK DATA (DANE PRZYKŁADOWE) ---
-// W przyszłości pobierzemy to z Twojego API we Flasku
+// Używamy ich jako wartości początkowej, zanim przyjdą dane z API
 const mockTrips = [
   {
     id: 1,
     title: 'Weekend w Tatrach 🏔️',
     date: '15-17 Października',
     description: 'Jesienne wyjście na szlaki i relaks w termach.',
-    image: 'bg-gradient-to-br from-green-400 to-blue-500', // Uproszczone tło zamiast zdjęcia
+    image: 'bg-gradient-to-br from-green-400 to-blue-500', 
     packingList: [
       { id: 1, item: 'Kurtka przeciwdeszczowa', checked: false },
       { id: 2, item: 'Buty trekkingowe', checked: false },
@@ -17,16 +18,48 @@ const mockTrips = [
       { id: 4, item: 'Gotówka (na schroniska)', checked: false },
     ],
     attractions: [
-      { id: 1, name: 'Morskie Oko', type: 'Natura', note: 'Wyjść rano o 7:00!' },
-      { id: 2, name: 'Krupówki', type: 'Miasto', note: 'Kupić oscypka' },
-      { id: 3, name: 'Termy Chochołowskie', type: 'Relaks', note: 'Wieczorem' },
+      { id: 1, name: 'Morskie Oko', type: 'Natura', note: 'Wyjść rano o 7:00!', votes: 0, status: 'Zatwierdzone' },
+      { id: 2, name: 'Krupówki', type: 'Miasto', note: 'Kupić oscypka', votes: 0, status: 'Propozycja' },
     ],
-    schedule: [
-      { time: '08:00', activity: 'Wyjazd z Krakowa' },
-      { time: '11:00', activity: 'Wejście na szlak (Palenica)' },
-      { time: '18:00', activity: 'Obiad w karczmie' },
-    ]
+    schedule: []
   },
+  // ... (reszta mocków opcjonalna)
+];
+
+export default function Dashboard() {
+  // 1. STAN: Trzymamy tylko ID wybranej wycieczki
+  const [selectedTripId, setSelectedTripId] = useState(null);
+  const [activeTab, setActiveTab] = useState('harmonogram');
+  const [trips, setTrips] = useState(mockTrips);
+
+  // 2. EFEKT: Pobranie danych z backendu (żeby nadpisać mocki)
+  useEffect(() => {
+    fetch('http://127.0.0.1:5001/api/trips')
+      .then(res => res.json())
+      .then(data => setTrips(data))
+      .catch(err => console.error("Backend nie działa, używam mocków:", err));
+  }, []);
+
+  // 3. OBSŁUGA GŁOSOWANIA
+  const handleVote = (tripId, attractionId) => {
+    fetch(`http://127.0.0.1:5001/api/attractions/${attractionId}/vote`, {
+        method: 'POST'
+    })
+    .then(res => res.json())
+    .then(updatedAttraction => {
+        console.log("Nowy stan atrakcji:", updatedAttraction);
+        
+        setTrips(prevTrips => prevTrips.map(trip => {
+            if (trip.id !== tripId) return trip;
+            return {
+                ...trip,
+                attractions: trip.attractions.map(attr => 
+                    attr.id === attractionId ? updatedAttraction : attr
+                )
+            };
+        }));
+    })
+    .catch(err => console.error("Błąd głosowania:", err));
   {
     id: 2,
     title: 'City Break Trójmiasto 🌊',
@@ -115,7 +148,8 @@ export default function Dashboard() {
   };
 
   // --- WIDOK 1: LISTA PODRÓŻY (DASHBOARD GŁÓWNY) ---
-  if (!selectedTrip) {
+  // Sprawdzamy ID, a nie obiekt
+  if (!selectedTripId) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
         <header className="mb-10 flex justify-between items-center">
@@ -129,13 +163,14 @@ export default function Dashboard() {
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {mockTrips.map((trip) => (
+          {trips.map((trip) => (
             <div 
               key={trip.id}
+              // POPRAWKA: Ustawiamy ID, a nie obiekt
+              onClick={() => setSelectedTripId(trip.id)}
               onClick={() => loadPacking(trip)}
               className="bg-white rounded-xl shadow-sm hover:shadow-md transition cursor-pointer border border-gray-100 overflow-hidden group"
             >
-              {/* Kolorowy nagłówek karty (zamiast zdjęcia) */}
               <div className={`h-32 ${trip.image} p-4 flex items-end`}>
                 <span className="bg-white/90 px-2 py-1 rounded text-xs font-bold text-gray-700">
                   {trip.date}
@@ -149,9 +184,7 @@ export default function Dashboard() {
                   {trip.description}
                 </p>
                 <div className="flex gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  <span>{trip.attractions.length} Atrakcji</span>
-                  <span>•</span>
-                  <span>{trip.packingList.length} Rzeczy</span>
+                  <span>{trip.attractions ? trip.attractions.length : 0} Atrakcji</span>
                 </div>
               </div>
             </div>
@@ -162,49 +195,23 @@ export default function Dashboard() {
   }
 
   // --- WIDOK 2: SZCZEGÓŁY PODRÓŻY ---
+  
+  // KLUCZOWY MOMENT: Znajdujemy aktualną wersję wycieczki na podstawie ID
+  // Dzięki temu, gdy `trips` się zmieni (po głosowaniu), `selectedTrip` też się odświeży.
+  const selectedTrip = trips.find(t => t.id === selectedTripId);
+
+  // Zabezpieczenie (gdyby ID było niepoprawne)
+  if (!selectedTrip) return <div>Nie znaleziono wycieczki.</div>;
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Pasek nawigacji powrotu */}
-      <div className="bg-white border-b px-8 py-4 flex items-center justify-between shadow-sm sticky top-0 z-10">
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => {
-              setSelectedTrip(null);
-              setActiveTab('harmonogram'); // Reset zakładki po wyjściu
-            }}
-            className="p-2 hover:bg-gray-100 rounded-full transition text-gray-600"
-          >
-            ⬅ Wróć
-          </button>
-          <h1 className="text-xl font-bold text-gray-800">{selectedTrip.title}</h1>
-        </div>
-        <div className="text-sm text-gray-500 font-medium">
-          {selectedTrip.date}
-        </div>
-      </div>
-
-      <main className="flex-1 p-4 md:p-8 max-w-5xl mx-auto w-full">
-        {/* Zakładki */}
-        <div className="flex space-x-1 bg-gray-200 p-1 rounded-xl mb-8 w-fit mx-auto md:mx-0">
-          {[
-            { id: 'harmonogram', label: '📅 Harmonogram' },
-            { id: 'pakowanie', label: '🎒 Lista Pakowania' },
-            { id: 'atrakcje', label: '🎡 Atrakcje' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                activeTab === tab.id
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
+    <TripDetails 
+      selectedTrip={selectedTrip} // Przekazujemy "żywą" wersję
+      activeTab={activeTab} 
+      setActiveTab={setActiveTab} 
+      // Przekazujemy funkcję resetującą ID (powrót do listy)
+      setSelectedTrip={() => setSelectedTripId(null)} 
+      handleVote={handleVote}
+    />
         {/* Treść Zakładek */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[400px]">
           
