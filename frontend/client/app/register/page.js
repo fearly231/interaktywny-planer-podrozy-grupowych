@@ -64,6 +64,13 @@ export default function Registration() {
             Zarejestruj się
           </button>
         </form>
+        <button
+          type="button"
+          className="w-full mt-4 py-2 px-4 bg-gray-200 hover:bg-gray-300 text-blue-700 font-semibold rounded-md transition duration-200"
+          onClick={() => window.location.href = '/'}
+        >
+          Powrót do logowania
+        </button>
       </div>
     </div>
   );

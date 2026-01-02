@@ -22,7 +22,8 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        // Zapisujemy token (opcjonalnie) i przekierowujemy
+        // Zapisujemy token i user_id
+        localStorage.setItem('user_id', data.user_id);
         localStorage.setItem('token', data.token);
         router.push('/dashboard');
       } else {

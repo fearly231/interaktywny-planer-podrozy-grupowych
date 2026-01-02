@@ -4,18 +4,18 @@ from flask_cors import CORS
 import jwt
 import datetime
 
-# Importujemy nasze funkcje z nowego pliku db.py
-
-# ZMIANA 1: Importujemy klasę Database, a nie stare funkcje
-from db import Database 
-from models import ScheduleItem, PackingItem
+from db.db import Database 
+from scheduleItem import ScheduleItem
+from packingItem import PackingItem
 from Attraction.attraction import Attraction
+from Trip.tripRepository import TripRepository
+from Trip.tripBuilder import TripBuilder
+from users.user import User
 
 app = Flask(__name__)
 CORS(app)
 
-# ZMIANA 2: Inicjalizujemy Singletona (to automatycznie stworzy tabele w bazie)
-# Zamiast starego init_db()
+# Inicjalizujemy Singletona (to automatycznie stworzy tabele w bazie)
 Database()
 
 SECRET_KEY = 'supersekretnykluczjwt'  # w produkcji ustaw przez ENV!
@@ -26,14 +26,12 @@ def login():
     username = data.get('username')
     password = data.get('password')
 
-    # ZMIANA 3: Pobieramy połączenie z Singletona
     db = Database()
     conn = db.get_connection()
     
     try:
         # Wykonujemy zapytanie
         user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
-        # WAŻNE: USUNĘLIŚMY conn.close() - Singleton trzyma połączenie otwarte!
 
         if user and user['password'] == password:
             # Generujemy token JWT
@@ -44,7 +42,8 @@ def login():
             return jsonify({
                 "status": "success",
                 "token": token,
-                "user": user['username']
+                "user": user['username'],
+                "user_id": user['id']
             }), 200
         else:
             return jsonify({"status": "error", "message": "Błędne dane logowania"}), 401
@@ -75,61 +74,77 @@ def get_dashboard_data():
     })
 
 
-attr1 = Attraction(1, "Morskie Oko", "Natura", "Wyjść rano o 7:00!")
-attr2 = Attraction(2, "Krupówki", "Miasto", "Kupić oscypka")
-attr3 = Attraction(3, "Termy Chochołowskie", "Relaks", "Wieczorem")
+@app.route('/api/trips', methods=['GET'])
 
-
-attr1.approve()
-attr3.reject()  
-
-
-
-
-# --- 2. "BAZA DANYCH" W PAMIĘCI ---
-# Dzięki temu możemy szybko znaleźć obiekt po ID
-attractions_db = {
-    1: attr1,
-    2: attr2,
-    3: attr3
-}
 
 @app.route('/api/trips', methods=['GET'])
 def get_trips():
-    # Budujemy listę dynamicznie, żeby zawsze mieć aktualne liczby głosów
-    trips_data = [
-      {
-        "id": 1,
-        "title": "Weekend w Tatrach 🏔️",
-        "date": "15-17 Października",
-        "description": "Jesienne wyjście na szlaki.",
-        "image": "bg-gradient-to-br from-green-400 to-blue-500",
-        "packingList": [],
-        "schedule": [],
-        "attractions": [
-            # Pobieramy aktualny stan obiektów
-            attractions_db[1].to_dict(),
-            attractions_db[2].to_dict(),
-            attractions_db[3].to_dict()
-        ]
-      }
-    ]
-    return jsonify(trips_data)
+    # Pobierz wszystkie tripa z bazy danych
+    repo = TripRepository()
+    conn = Database().get_connection()
+    try:
+        trips_rows = conn.execute('SELECT id FROM trips ORDER BY id DESC').fetchall()
+        trips_list = []
+        for row in trips_rows:
+            trip = repo.get_by_id(row['id'])
+            if trip:
+                trips_list.append(trip.to_dict())
+        return jsonify(trips_list)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
-# --- 3. NOWY ENDPOINT: GŁOSOWANIE ---
 @app.route('/api/attractions/<int:attr_id>/vote', methods=['POST'])
 def vote_attraction(attr_id):
-    # Szukamy obiektu w naszej "bazie"
-    attraction = attractions_db.get(attr_id)
+    """Dodaj głos użytkownika na atrakcję (jeden głos per użytkownik per atrakcja)."""
+    data = request.json or {}
+    user_id = data.get('user_id')
     
-    if not attraction:
-        return jsonify({"error": "Nie znaleziono atrakcji"}), 404
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
     
-
-    attraction.vote_up()
-    
-    # Zwracamy zaktualizowany obiekt do Reacta
-    return jsonify(attraction.to_dict())
+    conn = Database().get_connection()
+    try:
+        # Sprawdź czy atrakcja istnieje
+        attraction = conn.execute(
+            'SELECT id, trip_id, name, type, note FROM trip_attractions WHERE id = ?',
+            (attr_id,)
+        ).fetchone()
+        
+        if not attraction:
+            return jsonify({"error": "Nie znaleziono atrakcji"}), 404
+        
+        # Sprawdź czy użytkownik już głosował
+        existing_vote = conn.execute(
+            'SELECT id FROM attraction_votes WHERE attraction_id = ? AND user_id = ?',
+            (attr_id, user_id)
+        ).fetchone()
+        
+        if existing_vote:
+            return jsonify({"error": "Już głosowałeś na tę atrakcję"}), 409
+        
+        # Dodaj nowy głos
+        conn.execute(
+            'INSERT INTO attraction_votes (attraction_id, user_id) VALUES (?, ?)',
+            (attr_id, user_id)
+        )
+        conn.commit()
+        
+        # Pobierz liczę głosów
+        vote_count = conn.execute(
+            'SELECT COUNT(*) as votes FROM attraction_votes WHERE attraction_id = ?',
+            (attr_id,)
+        ).fetchone()['votes']
+        
+        # Zwróć zaktualizowaną atrakcję
+        return jsonify({
+            "id": attraction['id'],
+            "name": attraction['name'],
+            "type": attraction['type'],
+            "note": attraction['note'],
+            "votes": vote_count
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 @app.route('/api/schedule', methods=['GET'])
 def get_schedule():
     """Return all schedule items from the database."""
@@ -276,6 +291,104 @@ def delete_schedule_item(item_id):
         return jsonify({"status": "success"}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/trips', methods=['POST'])
+def create_trip():
+    data = request.json or {}
+    title = data.get('title')
+    start = data.get('start_date')
+    end = data.get('end_date')
+    budget = data.get('budget', 0)
+    user_id = data.get('user_id')
+
+    if not title:
+        return jsonify({'status': 'error', 'message': 'title required'}), 400
+
+    # validate user_id exists and convert to int when possible
+    if not user_id:
+        return jsonify({'status': 'error', 'message': 'user_id required'}), 400
+    try:
+        user_id = int(user_id)
+    except Exception:
+        # try to fetch user by username if a string was passed
+        db = Database()
+        conn = db.get_connection()
+        urow = conn.execute('SELECT id FROM users WHERE username = ?', (user_id,)).fetchone() if isinstance(user_id, str) else None
+        if urow:
+            user_id = urow['id']
+        else:
+            return jsonify({'status': 'error', 'message': 'invalid user_id'}), 400
+
+    try:
+        # build trip
+        builder = TripBuilder().set_title(title).set_dates(start, end).set_budget(budget)
+        trip = builder.build()
+        repo = TripRepository()
+        trip = repo.save(trip)
+
+        # add creator as admin
+        conn = Database().get_connection()
+        conn.execute('INSERT INTO trip_members (trip_id, user_id, role) VALUES (?, ?, ?)', (trip.id, user_id, 'admin'))
+        conn.commit()
+
+        return jsonify(trip.to_dict()), 201
+    except Exception as e:
+        # Log and return error details to help debugging (safe in dev)
+        print('Error creating trip:', e)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/trips/<int:trip_id>', methods=['GET'])
+def get_trip(trip_id):
+    repo = TripRepository()
+    trip = repo.get_by_id(trip_id)
+    if not trip:
+        return jsonify({'status': 'error', 'message': 'not found'}), 404
+    return jsonify(trip.to_dict())
+
+@app.route('/api/trips/<int:trip_id>/members', methods=['POST'])
+def add_trip_member(trip_id):
+    data = request.json or {}
+    username = data.get('username')
+    if not username:
+        return jsonify({'status': 'error', 'message': 'username required'}), 400
+    conn = Database().get_connection()
+    user = conn.execute('SELECT id, username FROM users WHERE username = ?', (username,)).fetchone()
+    if not user:
+        return jsonify({'status': 'error', 'message': 'user not found'}), 404
+    try:
+        conn.execute('INSERT INTO trip_members (trip_id, user_id, role) VALUES (?, ?, ?)', (trip_id, user['id'], 'member'))
+        conn.commit()
+        # Pobierz zaktualizowaną listę członków
+        members = conn.execute(
+            'SELECT u.id, u.username, tm.role FROM trip_members tm JOIN users u ON tm.user_id = u.id WHERE tm.trip_id = ?',
+            (trip_id,)
+        ).fetchall()
+        members_list = [dict(m) for m in members] if members else []
+        return jsonify({'status': 'success', 'members': members_list}), 201
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/trips/<int:trip_id>/attractions', methods=['POST'])
+def add_trip_attraction(trip_id):
+    data = request.json or {}
+    name = data.get('name')
+    type_ = data.get('type')
+    note = data.get('note')
+    if not name:
+        return jsonify({'status': 'error', 'message': 'name required'}), 400
+    conn = Database().get_connection()
+    try:
+        conn.execute('INSERT INTO trip_attractions (trip_id, name, type, note) VALUES (?, ?, ?, ?)', (trip_id, name, type_, note))
+        conn.commit()
+        # Pobierz zaktualizowaną listę atrakcji dla tego tripa
+        attractions = conn.execute(
+            'SELECT id, trip_id, name, type, note, votes FROM trip_attractions WHERE trip_id = ?',
+            (trip_id,)
+        ).fetchall()
+        attractions_list = [dict(a) for a in attractions] if attractions else []
+        return jsonify({'status': 'success', 'attractions': attractions_list}), 201
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

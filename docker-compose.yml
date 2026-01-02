@@ -11,6 +11,8 @@ services:
     volumes:
       # Mapujemy kod z nowej lokalizacji do kontenera
       - ./backend/server:/app
+      # Baza danych przechowywana w /data (poza volumes dev)
+      - travel_planner_data:/data
     environment:
       - FLASK_ENV=development
 
@@ -29,3 +31,6 @@ services:
       - backend
     environment:
       - WATCHPACK_POLLING=true
+
+volumes:
+  travel_planner_data:

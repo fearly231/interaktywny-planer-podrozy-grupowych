@@ -1,10 +1,37 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PackingList from './PackingList';
 import AttractionsList from './AttractionsList';
 import Schedule from './Schedule';
 
-export default function TripDetails({ selectedTrip, activeTab, setActiveTab, setSelectedTrip, handleVote, togglePacking }) {
+export default function TripDetails({ selectedTrip, activeTab, setActiveTab, setSelectedTrip, handleVote, togglePacking, addPackingItem, refreshTrip }) {
+  const [newAttractionName, setNewAttractionName] = useState('');
+  const [addingAttraction, setAddingAttraction] = useState(false);
+
   if (!selectedTrip) return null;
+
+  const handleAddAttraction = async () => {
+    const name = newAttractionName.trim();
+    if (!name) return;
+    
+    try {
+      setAddingAttraction(true);
+      const res = await fetch(`http://localhost:5001/api/trips/${selectedTrip.id}/attractions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      
+      if (res.ok) {
+        setNewAttractionName('');
+        // Odśwież trip aby pobrać zaktualizowaną listę atrakcji
+        if (refreshTrip) await refreshTrip(selectedTrip.id);
+      }
+    } catch (err) {
+      console.error('Nie udało się dodać atrakcji', err);
+    } finally {
+      setAddingAttraction(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -23,7 +50,7 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
           <h1 className="text-xl font-bold text-gray-800">{selectedTrip.title}</h1>
         </div>
         <div className="text-sm text-gray-500 font-medium">
-          {selectedTrip.date}
+          {selectedTrip.start_date} - {selectedTrip.end_date}
         </div>
       </div>
 
@@ -55,10 +82,35 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
             <Schedule schedule={selectedTrip.schedule} />
           )}
           {activeTab === 'pakowanie' && (
-            <PackingList packingList={selectedTrip.packingList} togglePacking={togglePacking} />
+            <PackingList packingList={selectedTrip.packingList} togglePacking={togglePacking} addPackingItem={addPackingItem} />
           )}
           {activeTab === 'atrakcje' && (
-            <AttractionsList attractions={selectedTrip.attractions} handleVote={handleVote} tripId={selectedTrip.id} />
+            <div className="space-y-6">
+              {/* Formularz do dodawania atrakcji */}
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h3 className="font-semibold text-gray-800 mb-3">➕ Dodaj nową atrakcję</h3>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newAttractionName}
+                    onChange={e => setNewAttractionName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAddAttraction(); }}
+                    placeholder="np. Muzeum, Park, Restauracja..."
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-800"
+                  />
+                  <button
+                    onClick={handleAddAttraction}
+                    disabled={addingAttraction || !newAttractionName.trim()}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition disabled:bg-gray-400"
+                  >
+                    {addingAttraction ? 'Dodawanie...' : 'Dodaj'}
+                  </button>
+                </div>
+              </div>
+              
+              {/* Lista atrakcji */}
+              <AttractionsList attractions={selectedTrip.attractions} handleVote={handleVote} tripId={selectedTrip.id} />
+            </div>
           )}
         </div>
       </main>

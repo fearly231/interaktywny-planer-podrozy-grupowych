@@ -13,12 +13,9 @@ class Attraction:
 
     # Metoda zmieniająca stan (używana przez stany konkretne)
     def change_state(self, new_state: AttractionState) -> None:
-        print(f"--- Zmiana stanu: {type(self._state).__name__} -> {type(new_state).__name__} ---")
         self._state = new_state
 
     # --- Delegowanie zadań do aktualnego stanu ---
-    # Atrakcja nie myśli "czy mogę zagłosować?". Ona pyta o to swój Stan.
-    
     def vote_up(self):
         self._state.handle_vote(self)
 
