@@ -79,11 +79,24 @@ def get_dashboard_data():
 
 @app.route('/api/trips', methods=['GET'])
 def get_trips():
-    # Pobierz wszystkie tripa z bazy danych
+    # Pobierz user_id z query parametru lub header'a
+    user_id = request.args.get('user_id') or request.headers.get('X-User-ID')
+    
+    if not user_id:
+        return jsonify({'status': 'error', 'message': 'user_id required'}), 400
+    
     repo = TripRepository()
     conn = Database().get_connection()
     try:
-        trips_rows = conn.execute('SELECT id FROM trips ORDER BY id DESC').fetchall()
+        # Pobierz tylko wycieczki, w których użytkownik jest członkiem
+        trips_rows = conn.execute(
+            '''SELECT DISTINCT t.id FROM trips t 
+               JOIN trip_members tm ON t.id = tm.trip_id 
+               WHERE tm.user_id = ? 
+               ORDER BY t.id DESC''',
+            (user_id,)
+        ).fetchall()
+        
         trips_list = []
         for row in trips_rows:
             trip = repo.get_by_id(row['id'])

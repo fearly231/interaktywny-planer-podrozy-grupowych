@@ -64,11 +64,28 @@ export default function Dashboard() {
 
   // 2. EFEKT: Pobranie danych z backendu
   useEffect(() => {
-    fetch('http://127.0.0.1:5001/api/trips')
-      .then(res => res.json())
-      .then(data => setTrips(data))
-      .catch(err => console.error("Błąd pobierania tripów:", err));
+    loadTrips();
   }, []);
+
+  const loadTrips = async () => {
+    try {
+      const userId = localStorage.getItem('user_id');
+      if (!userId) {
+        console.error('Brak user_id w localStorage');
+        return;
+      }
+      
+      const response = await fetch(`http://localhost:5001/api/trips?user_id=${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setTrips(data);
+      } else {
+        console.error('Błąd pobierania wycieczek:', response.status);
+      }
+    } catch (err) {
+      console.error('Błąd ładowania wycieczek:', err);
+    }
+  };
 
   // Funkcja do odświeżenia tripa z backendu (gdy zmienią się atrakcje/członkowie)
   const refreshTrip = async (tripId) => {
