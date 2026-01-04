@@ -25,6 +25,7 @@ export default function LoginPage() {
         // Zapisujemy token i user_id
         localStorage.setItem('user_id', data.user_id);
         localStorage.setItem('token', data.token);
+        localStorage.setItem('username', data.user); // lub data.username
         router.push('/dashboard');
       } else {
         setError(data.message || 'Błąd logowania');
