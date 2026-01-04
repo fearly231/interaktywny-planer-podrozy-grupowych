@@ -3,30 +3,21 @@ import sqlite3
 
 class Database:
     _instance = None
-    DB_FILE = '/data/travel_planner.db'
+    DB_FILE = '/app/db/travel_planner.db'
 
     def __new__(cls):
-        # Sprawdzamy, czy instancja już istnieje
         if cls._instance is None:
             cls._instance = super(Database, cls).__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 
     def __init__(self):
-        # Jeśli już zainicjalizowano, nic nie rób
+
         if self._initialized:
             return
-
-        # Nawiązanie trwałego połączenia
-        # check_same_thread=False jest kluczowe, jeśli używasz tego w serwerze (np. Flask),
-        # aby wątki nie kłóciły się o jeden obiekt połączenia.
         self.connection = sqlite3.connect(self.DB_FILE, check_same_thread=False)
         self.connection.row_factory = sqlite3.Row
-
-        # Automatyczne uruchomienie logiki tworzenia tabel
         self._init_db_structure()
-
-        # Oznaczamy jako zainicjalizowany
         self._initialized = True
 
     def _init_db_structure(self):
@@ -100,7 +91,6 @@ class Database:
                 )
             ''')
 
-            # Migracje: dodaj brakujące kolumny w istniejących tabelach
             cur.execute("PRAGMA table_info(trips)")
             cols = [r['name'] for r in cur.fetchall()]
             if 'owner_user_id' not in cols:
@@ -125,7 +115,6 @@ class Database:
                 except Exception:
                     pass
 
-            # Default user and commit
             cur.execute("SELECT * FROM users WHERE username = ?", ('podroznik',))
             if cur.fetchone() is None:
                 cur.execute("INSERT INTO users (username, password) VALUES (?, ?)", ('podroznik', '1234'))
