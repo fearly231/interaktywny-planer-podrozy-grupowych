@@ -6,12 +6,17 @@ import NewTripForm from './NewTripForm';
 
 export default function Dashboard() {
   const router = useRouter();
+  const [userName, setUserName] = useState('');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('token');
       if (!token) {
         router.replace('/');
+      } else {
+        // Pobierz nazwę użytkownika z localStorage z fallbackiem
+        const name = localStorage.getItem('username') || localStorage.getItem('user_id') || 'Użytkowniku';
+        setUserName(name);
       }
     }
   }, [router]);
@@ -233,19 +238,22 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold text-gray-800">Moje Podróże 🌍</h1>
             <p className="text-gray-500">Wybierz wyjazd, aby zobaczyć szczegóły</p>
           </div>
-          <div className="flex gap-2">
-            <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition" onClick={() => setShowNewTrip(true)}>
-              + Nowa Podróż
-            </button>
-            <button
-              className="bg-gray-200 hover:bg-gray-300 text-blue-700 px-4 py-2 rounded-lg shadow transition font-semibold"
-              onClick={() => {
-                localStorage.removeItem('token');
-                router.replace('/');
-              }}
-            >
-              Wyloguj się
-            </button>
+          <div className="flex flex-col items-end gap-3">
+            <p className="text-gray-700 font-medium">Witaj {userName}!</p>
+            <div className="flex gap-2">
+              <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition" onClick={() => setShowNewTrip(true)}>
+                + Nowa Podróż
+              </button>
+              <button
+                className="bg-gray-200 hover:bg-gray-300 text-blue-700 px-4 py-2 rounded-lg shadow transition font-semibold"
+                onClick={() => {
+                  localStorage.removeItem('token');
+                  router.replace('/');
+                }}
+              >
+                Wyloguj się
+              </button>
+            </div>
           </div>
         </header>
 
@@ -299,15 +307,18 @@ export default function Dashboard() {
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Szczegóły podróży</h1>
           </div>
-          <button
-            className="bg-gray-200 hover:bg-gray-300 text-blue-700 px-4 py-2 rounded-lg shadow transition font-semibold"
-            onClick={() => {
-              localStorage.removeItem('token');
-              router.replace('/');
-            }}
-          >
-            Wyloguj się
-          </button>
+          <div className="flex flex-col items-end gap-3">
+            <p className="text-gray-700 font-medium">Witaj {userName}</p>
+            <button
+              className="bg-gray-200 hover:bg-gray-300 text-blue-700 px-4 py-2 rounded-lg shadow transition font-semibold"
+              onClick={() => {
+                localStorage.removeItem('token');
+                router.replace('/');
+              }}
+            >
+              Wyloguj się
+            </button>
+          </div>
         </header>
         <TripDetails 
           selectedTrip={selectedTrip}
