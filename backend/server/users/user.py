@@ -6,7 +6,7 @@ class User:
     id: Optional[int] = None
     username: str = ""
     password: str = ""
-    system_role: str = "user"  # np. 'user', 'admin', 'system'
+    system_role: str = "user"  # np. 'user', 'moderator', 'system'
 
     def to_dict(self) -> dict:
         return {

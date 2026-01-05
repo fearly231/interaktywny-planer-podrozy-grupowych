@@ -273,9 +273,34 @@ export default function Dashboard() {
                 <h3 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-600 transition">
                   {trip.title}
                 </h3>
-                <div className="flex gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <div className="flex gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
                   <span>{trip.attractions ? trip.attractions.length : 0} Atrakcji</span>
                 </div>
+                
+                {/* Lista uczestników */}
+                {trip.members && trip.members.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <p className="text-xs font-semibold text-gray-500 mb-2">Uczestnicy:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {trip.members.slice(0, 4).map((member, idx) => (
+                        <div 
+                          key={idx}
+                          className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs"
+                        >
+                          <span className="w-5 h-5 bg-blue-200 rounded-full flex items-center justify-center font-bold">
+                            {member.username ? member.username.charAt(0).toUpperCase() : '?'}
+                          </span>
+                          <span>{member.username || member.name || `Użytkownik ${member.user_id}`}</span>
+                        </div>
+                      ))}
+                      {trip.members.length > 4 && (
+                        <div className="flex items-center text-xs text-gray-500 font-semibold">
+                          +{trip.members.length - 4} więcej
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
