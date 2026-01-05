@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TripDetails from './TripDetails';
 import NewTripForm from './NewTripForm';
+import Snowfall from './Snowfall';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -233,6 +234,7 @@ export default function Dashboard() {
   if (!selectedTripId) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
+        <Snowfall />
         <header className="mb-10 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Moje Podróże 🌍</h1>
@@ -327,6 +329,7 @@ export default function Dashboard() {
 
   return (
     <>
+      <Snowfall />
       <div className="min-h-screen bg-gray-50 p-8">
         <header className="mb-10 flex justify-between items-center">
           <div>
