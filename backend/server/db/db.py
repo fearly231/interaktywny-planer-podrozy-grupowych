@@ -68,7 +68,8 @@ class Database:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     trip_id INTEGER NOT NULL,
                     user_id INTEGER NOT NULL,
-                    role TEXT DEFAULT 'member'
+                    role TEXT DEFAULT 'member',
+                    UNIQUE(trip_id, user_id)
                 )
             ''')
 
@@ -118,6 +119,9 @@ class Database:
             cur.execute("SELECT * FROM users WHERE username = ?", ('podroznik',))
             if cur.fetchone() is None:
                 cur.execute("INSERT INTO users (username, password) VALUES (?, ?)", ('podroznik', '1234'))
+
+            # Migracja: zmień wszystkie role 'admin' na 'moderator'
+            cur.execute("UPDATE trip_members SET role = 'moderator' WHERE role = 'admin'")
 
             self.connection.commit()
             

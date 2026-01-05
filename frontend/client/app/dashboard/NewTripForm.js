@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 
 export default function NewTripForm({ onCreate }) {
   const [title, setTitle] = useState('');
-  const [budget, setBudget] = useState(0);
+  const [budget, setBudget] = useState('');
   const [attractionName, setAttractionName] = useState('');
   const [attractions, setAttractions] = useState([]);
   const [memberUsername, setMemberUsername] = useState('');
@@ -30,7 +30,6 @@ export default function NewTripForm({ onCreate }) {
     if (!name) return;
     setAttractions(prev => [...prev, { name }]);
     setAttractionName('');
-    titleRef.current?.focus?.();
   };
 
   const removeAttraction = (idx) => {
@@ -149,7 +148,7 @@ export default function NewTripForm({ onCreate }) {
       }
 
       // Dodaj członków i zbierz ostatnie dane
-      let updatedMembers = [...(trip.trip_members || [])];
+      let updatedMembers = [...(trip.members || [])];
       for (const m of members) {
         try {
           const res = await fetch(`http://localhost:5001/api/trips/${trip.id}/members`, {
@@ -174,7 +173,7 @@ export default function NewTripForm({ onCreate }) {
         updated.attractions = updatedAttractions;
       }
       if (updatedMembers.length > 0) {
-        updated.trip_members = updatedMembers;
+        updated.members = updatedMembers;
       }
       
       try {
@@ -186,7 +185,7 @@ export default function NewTripForm({ onCreate }) {
       setLoading(false);
       setTitle('');
       setStartDay(''); setStartYearInput(''); setEndDay(''); setEndYearInput('');
-      setBudget(0);
+      setBudget('');
       setAttractions([]);
       setMembers([]);
       setDescription('');
@@ -289,7 +288,7 @@ export default function NewTripForm({ onCreate }) {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Budżet (PLN)</label>
                 <div className="relative">
                   <span className="absolute left-4 top-3 text-gray-500 font-semibold">💰</span>
-                  <input type="number" value={budget} onChange={e => setBudget(parseFloat(e.target.value) || 0)} className="w-full pl-12 pr-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg focus:bg-white focus:border-blue-500 focus:outline-none text-gray-800 placeholder-gray-400 transition font-medium" placeholder="0" />
+                  <input type="number" value={budget} onChange={e => setBudget(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg focus:bg-white focus:border-blue-500 focus:outline-none text-gray-800 placeholder-gray-400 transition font-medium" placeholder="0" />
                 </div>
               </div>
             </div>
@@ -417,7 +416,7 @@ export default function NewTripForm({ onCreate }) {
                 setError('');
                 setSuccess('');
                 setDescription('');
-                setBudget(0);
+                setBudget('');
                 setStartDay('');
                 setEndDay('');
               }}

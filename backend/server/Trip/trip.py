@@ -35,5 +35,5 @@ class Trip:
             "attractions": [a.to_dict() for a in self.attractions],
             "schedule": [s.to_dict() for s in self.schedule],
             "packingList": [p.to_dict() for p in self.packing_list],
-            "trip_members": [{"id": m.id, "username": m.username, "role": m.role} for m in self.members]
+            "members": [{"user_id": m.id, "username": m.username, "role": m.role} for m in self.members]
         }

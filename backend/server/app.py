@@ -339,11 +339,14 @@ def create_trip():
         repo = TripRepository()
         trip = repo.save(trip)
 
-        # add creator as admin
+        # add creator as moderator
         conn = Database().get_connection()
-        conn.execute('INSERT INTO trip_members (trip_id, user_id, role) VALUES (?, ?, ?)', (trip.id, user_id, 'admin'))
+        conn.execute('INSERT INTO trip_members (trip_id, user_id, role) VALUES (?, ?, ?)', (trip.id, user_id, 'moderator'))
         conn.commit()
 
+        # Przeładuj trip z bazy, aby zawierał członków
+        trip = repo.get_by_id(trip.id)
+        
         return jsonify(trip.to_dict()), 201
     except Exception as e:
         # Log and return error details to help debugging (safe in dev)
@@ -368,16 +371,67 @@ def add_trip_member(trip_id):
     user = conn.execute('SELECT id, username FROM users WHERE username = ?', (username,)).fetchone()
     if not user:
         return jsonify({'status': 'error', 'message': 'user not found'}), 404
+    
+    # Sprawdź czy użytkownik już jest członkiem
+    existing_member = conn.execute(
+        'SELECT id FROM trip_members WHERE trip_id = ? AND user_id = ?',
+        (trip_id, user['id'])
+    ).fetchone()
+    if existing_member:
+        return jsonify({'status': 'error', 'message': 'user already a member'}), 409
+    
     try:
         conn.execute('INSERT INTO trip_members (trip_id, user_id, role) VALUES (?, ?, ?)', (trip_id, user['id'], 'member'))
         conn.commit()
         # Pobierz zaktualizowaną listę członków
         members = conn.execute(
-            'SELECT u.id, u.username, tm.role FROM trip_members tm JOIN users u ON tm.user_id = u.id WHERE tm.trip_id = ?',
+            'SELECT u.id as user_id, u.username, tm.role FROM trip_members tm JOIN users u ON tm.user_id = u.id WHERE tm.trip_id = ?',
             (trip_id,)
         ).fetchall()
         members_list = [dict(m) for m in members] if members else []
         return jsonify({'status': 'success', 'members': members_list}), 201
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/trips/<int:trip_id>/members/<int:user_id>', methods=['DELETE'])
+def remove_trip_member(trip_id, user_id):
+    """Usuń członka z wycieczki (tylko moderator może usuwać)"""
+    data = request.json or {}
+    requester_id = data.get('requester_id')  # ID użytkownika wykonującego żądanie
+    
+    if not requester_id:
+        return jsonify({'status': 'error', 'message': 'requester_id required'}), 400
+    
+    conn = Database().get_connection()
+    
+    # Sprawdź czy użytkownik wykonujący żądanie jest moderatorem
+    requester = conn.execute(
+        'SELECT role FROM trip_members WHERE trip_id = ? AND user_id = ?',
+        (trip_id, requester_id)
+    ).fetchone()
+    
+    if not requester or requester['role'] != 'moderator':
+        return jsonify({'status': 'error', 'message': 'only moderators can remove members'}), 403
+    
+    # Nie pozwól moderatorowi usunąć samego siebie
+    if int(requester_id) == int(user_id):
+        return jsonify({'status': 'error', 'message': 'cannot remove yourself'}), 400
+    
+    try:
+        # Usuń członka
+        result = conn.execute('DELETE FROM trip_members WHERE trip_id = ? AND user_id = ?', (trip_id, user_id))
+        conn.commit()
+        
+        if result.rowcount == 0:
+            return jsonify({'status': 'error', 'message': 'member not found'}), 404
+        
+        # Zwróć zaktualizowaną listę członków
+        members = conn.execute(
+            'SELECT u.id as user_id, u.username, tm.role FROM trip_members tm JOIN users u ON tm.user_id = u.id WHERE tm.trip_id = ?',
+            (trip_id,)
+        ).fetchall()
+        members_list = [dict(m) for m in members] if members else []
+        return jsonify({'status': 'success', 'members': members_list}), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -393,9 +447,13 @@ def add_trip_attraction(trip_id):
     try:
         conn.execute('INSERT INTO trip_attractions (trip_id, name, type, note) VALUES (?, ?, ?, ?)', (trip_id, name, type_, note))
         conn.commit()
-        # Pobierz zaktualizowaną listę atrakcji dla tego tripa
+        # Pobierz zaktualizowaną listę atrakcji dla tego tripa z liczbą głosów
         attractions = conn.execute(
-            'SELECT id, trip_id, name, type, note, votes FROM trip_attractions WHERE trip_id = ?',
+            '''SELECT ta.id, ta.trip_id, ta.name, ta.type, ta.note, COUNT(av.id) as votes 
+               FROM trip_attractions ta 
+               LEFT JOIN attraction_votes av ON ta.id = av.attraction_id 
+               WHERE ta.trip_id = ? 
+               GROUP BY ta.id''',
             (trip_id,)
         ).fetchall()
         attractions_list = [dict(a) for a in attractions] if attractions else []

@@ -5,7 +5,7 @@ from typing import Optional
 class GroupMember:
     user_id: Optional[int] = None
     trip_id: Optional[int] = None
-    role: str = 'member'  # 'member' lub 'admin'
+    role: str = 'member'  # 'member' lub 'moderator'
 
     def to_dict(self):
         return {"user_id": self.user_id, "trip_id": self.trip_id, "role": self.role}
