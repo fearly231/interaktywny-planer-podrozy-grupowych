@@ -132,7 +132,7 @@ export default function ScheduleBuilder({ trip, attractions }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+      <h2 className="text-3xl font-bold text-gray-900 mb-6 flex items-center gap-2">
         <span>🧩</span>
         Buduj Harmonogram
       </h2>

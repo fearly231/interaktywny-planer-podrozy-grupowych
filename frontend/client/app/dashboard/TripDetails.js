@@ -4,14 +4,16 @@ import AttractionsList from './AttractionsList';
 import AttractionsVoting from './AttractionsVoting';
 import ScheduleBuilder from './ScheduleBuilder';
 import Schedule from './Schedule';
+import EditTripModal from './EditTripModal';
 
-export default function TripDetails({ selectedTrip, activeTab, setActiveTab, setSelectedTrip, handleVote, togglePacking, addPackingItem, refreshTrip }) {
+export default function TripDetails({ selectedTrip, activeTab, setActiveTab, setSelectedTrip, handleVote, handleUnvote, togglePacking, addPackingItem, refreshTrip, userVotedAttractions }) {
   const [newAttractionName, setNewAttractionName] = useState('');
   const [addingAttraction, setAddingAttraction] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState(null);
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberUsername, setNewMemberUsername] = useState('');
   const [addingMember, setAddingMember] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   if (!selectedTrip) return null;
 
@@ -101,6 +103,31 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
     }
   };
 
+  const handleEditTrip = async (updatedData) => {
+    try {
+      const res = await fetch(`http://localhost:5001/api/trips/${selectedTrip.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...updatedData,
+          requester_id: currentUserId
+        })
+      });
+      
+      if (res.ok) {
+        // Odśwież trip po edycji
+        await refreshTrip(selectedTrip.id);
+        setShowEditModal(false);
+      } else {
+        const error = await res.json();
+        alert(error.message || 'Nie udało się zaktualizować wycieczki');
+      }
+    } catch (err) {
+      console.error('Nie udało się zaktualizować wycieczki', err);
+      alert('Wystąpił błąd podczas aktualizacji wycieczki');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Pasek nawigacji powrotu */}
@@ -117,8 +144,18 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
           </button>
           <h1 className="text-xl font-bold text-gray-800">{selectedTrip.title}</h1>
         </div>
-        <div className="text-sm text-gray-500 font-medium">
-          {selectedTrip.start_date} - {selectedTrip.end_date}
+        <div className="flex items-center gap-4">
+          {isModerator && (
+            <button
+              onClick={() => setShowEditModal(true)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition flex items-center gap-2"
+            >
+              ✏️ Edytuj
+            </button>
+          )}
+          <div className="text-sm text-gray-500 font-medium">
+            {selectedTrip.start_date} - {selectedTrip.end_date}
+          </div>
         </div>
       </div>
 
@@ -184,7 +221,9 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
                 attractions={selectedTrip.attractions}
                 totalMembers={selectedTrip.members?.length || 0}
                 handleVote={handleVote}
+                handleUnvote={handleUnvote}
                 tripId={selectedTrip.id}
+                userVotedAttractions={userVotedAttractions || []}
               />
             </div>
           )}
@@ -278,6 +317,15 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
           </div>
         </div>
       </main>
+
+      {/* Modal edycji wycieczki */}
+      {showEditModal && (
+        <EditTripModal
+          trip={selectedTrip}
+          onClose={() => setShowEditModal(false)}
+          onSave={handleEditTrip}
+        />
+      )}
     </div>
   );
 }

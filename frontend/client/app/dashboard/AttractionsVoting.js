@@ -2,11 +2,16 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-export default function AttractionsVoting({ attractions, totalMembers, handleVote, tripId }) {
+export default function AttractionsVoting({ attractions, totalMembers, handleVote, handleUnvote, tripId, userVotedAttractions }) {
   // Oblicz procent głosów
   const getVotePercentage = (votes) => {
     if (totalMembers === 0) return 0;
     return Math.round((votes / totalMembers) * 100);
+  };
+
+  // Sprawdź czy użytkownik głosował na daną atrakcję
+  const hasUserVoted = (attractionId) => {
+    return userVotedAttractions && userVotedAttractions.includes(attractionId);
   };
 
   // Podziel atrakcje na zatwierdzone (>50%) i do rozważenia
@@ -84,12 +89,21 @@ export default function AttractionsVoting({ attractions, totalMembers, handleVot
 
           {/* Actions */}
           <div className="flex gap-2">
-            <button
-              onClick={() => handleVote(tripId, attraction.id)}
-              className="w-full px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition"
-            >
-              👍 Głosuj
-            </button>
+            {hasUserVoted(attraction.id) ? (
+              <button
+                onClick={() => handleUnvote(tripId, attraction.id)}
+                className="w-full px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition"
+              >
+                ✕ Cofnij głos
+              </button>
+            ) : (
+              <button
+                onClick={() => handleVote(tripId, attraction.id)}
+                className="w-full px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition"
+              >
+                👍 Głosuj
+              </button>
+            )}
           </div>
         </div>
       </motion.div>

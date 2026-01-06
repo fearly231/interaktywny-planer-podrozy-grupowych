@@ -158,6 +158,60 @@ def vote_attraction(attr_id):
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/attractions/<int:attr_id>/vote', methods=['DELETE'])
+def unvote_attraction(attr_id):
+    """Usuń głos użytkownika z atrakcji."""
+    data = request.json or {}
+    user_id = data.get('user_id')
+    
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+    
+    conn = Database().get_connection()
+    try:
+        # Sprawdź czy atrakcja istnieje
+        attraction = conn.execute(
+            'SELECT id, trip_id, name, type, note FROM trip_attractions WHERE id = ?',
+            (attr_id,)
+        ).fetchone()
+        
+        if not attraction:
+            return jsonify({"error": "Nie znaleziono atrakcji"}), 404
+        
+        # Sprawdź czy użytkownik głosował
+        existing_vote = conn.execute(
+            'SELECT id FROM attraction_votes WHERE attraction_id = ? AND user_id = ?',
+            (attr_id, user_id)
+        ).fetchone()
+        
+        if not existing_vote:
+            return jsonify({"error": "Nie głosowałeś na tę atrakcję"}), 404
+        
+        # Usuń głos
+        conn.execute(
+            'DELETE FROM attraction_votes WHERE attraction_id = ? AND user_id = ?',
+            (attr_id, user_id)
+        )
+        conn.commit()
+        
+        # Pobierz zaktualizowaną liczbę głosów
+        vote_count = conn.execute(
+            'SELECT COUNT(*) as votes FROM attraction_votes WHERE attraction_id = ?',
+            (attr_id,)
+        ).fetchone()['votes']
+        
+        # Zwróć zaktualizowaną atrakcję
+        return jsonify({
+            "id": attraction['id'],
+            "name": attraction['name'],
+            "type": attraction['type'],
+            "note": attraction['note'],
+            "votes": vote_count
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/schedule', methods=['GET'])
 def get_schedule():
     """Return all schedule items from the database."""
@@ -360,6 +414,67 @@ def get_trip(trip_id):
     if not trip:
         return jsonify({'status': 'error', 'message': 'not found'}), 404
     return jsonify(trip.to_dict())
+
+@app.route('/api/trips/<int:trip_id>', methods=['PUT'])
+def update_trip(trip_id):
+    """Aktualizuj dane wycieczki (nazwa, daty, budżet) - tylko moderator"""
+    data = request.json or {}
+    requester_id = data.get('requester_id')
+    
+    if not requester_id:
+        return jsonify({'status': 'error', 'message': 'requester_id required'}), 400
+    
+    conn = Database().get_connection()
+    
+    try:
+        # Sprawdź czy użytkownik jest moderatorem
+        member = conn.execute(
+            'SELECT role FROM trip_members WHERE trip_id = ? AND user_id = ?',
+            (trip_id, requester_id)
+        ).fetchone()
+        
+        if not member or member['role'] != 'moderator':
+            return jsonify({'status': 'error', 'message': 'Only moderator can edit trip'}), 403
+        
+        # Pobierz dane do aktualizacji
+        title = data.get('title')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        budget = data.get('budget')
+        
+        # Buduj zapytanie SQL dynamicznie
+        updates = []
+        params = []
+        
+        if title is not None:
+            updates.append('title = ?')
+            params.append(title)
+        if start_date is not None:
+            updates.append('start_date = ?')
+            params.append(start_date)
+        if end_date is not None:
+            updates.append('end_date = ?')
+            params.append(end_date)
+        if budget is not None:
+            updates.append('budget_limit = ?')
+            params.append(budget)
+        
+        if not updates:
+            return jsonify({'status': 'error', 'message': 'No fields to update'}), 400
+        
+        # Wykonaj aktualizację
+        params.append(trip_id)
+        query = f"UPDATE trips SET {', '.join(updates)} WHERE id = ?"
+        conn.execute(query, params)
+        conn.commit()
+        
+        # Zwróć zaktualizowaną wycieczkę
+        repo = TripRepository()
+        trip = repo.get_by_id(trip_id)
+        return jsonify(trip.to_dict()), 200
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/trips/<int:trip_id>/members', methods=['POST'])
 def add_trip_member(trip_id):

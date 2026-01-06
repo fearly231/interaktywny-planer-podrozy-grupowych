@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [selectedTripId, setSelectedTripId] = useState(null);
   const [activeTab, setActiveTab] = useState('harmonogram');
   const [showNewTrip, setShowNewTrip] = useState(false);
+  const [userVotedAttractions, setUserVotedAttractions] = useState([]);
   const API_BASE = 'http://localhost:5001';
 
   const handleCreateTrip = (tripOrId) => {
@@ -106,6 +107,34 @@ export default function Dashboard() {
     }
   };
 
+  // Funkcja do pobrania głosów użytkownika dla wycieczki
+  const loadUserVotes = async (tripId) => {
+    const USER_ID = localStorage.getItem('user_id');
+    if (!USER_ID) return;
+
+    try {
+      const trip = trips.find(t => t.id === tripId);
+      if (!trip || !trip.attractions) return;
+
+      // Sprawdź które atrakcje użytkownik zagłosował
+      // Tymczasowo używamy informacji z attractions (votes)
+      // W przyszłości można dodać endpoint do sprawdzania głosów użytkownika
+      const votedIds = [];
+      // Backend nie ma jeszcze endpointu do sprawdzania głosów użytkownika
+      // Więc tymczasowo będziemy śledzić to lokalnie po akcjach głosowania
+      setUserVotedAttractions(votedIds);
+    } catch (err) {
+      console.error('Błąd ładowania głosów użytkownika', err);
+    }
+  };
+
+  // Załaduj głosy użytkownika gdy zmieni się wybrana wycieczka
+  useEffect(() => {
+    if (selectedTripId) {
+      loadUserVotes(selectedTripId);
+    }
+  }, [selectedTripId]);
+
   // 3. OBSŁUGA GŁOSOWANIA
   const handleVote = (tripId, attractionId) => {
     const USER_ID = localStorage.getItem('user_id');
@@ -129,6 +158,7 @@ export default function Dashboard() {
     })
     .then(updatedAttraction => {
       if (!updatedAttraction) return; // 409 case
+      // Aktualizuj liczbę głosów w state
       setTrips(prevTrips => prevTrips.map(trip => {
         if (trip.id !== tripId) return trip;
         return {
@@ -138,8 +168,44 @@ export default function Dashboard() {
           )
         };
       }));
+      // Dodaj do listy głosów użytkownika
+      setUserVotedAttractions(prev => [...prev, attractionId]);
     })
     .catch(err => console.error("Błąd głosowania:", err));
+  };
+
+  // Cofnij głos
+  const handleUnvote = (tripId, attractionId) => {
+    const USER_ID = localStorage.getItem('user_id');
+    if (!USER_ID) {
+      console.error('Musisz być zalogowany, aby cofnąć głos');
+      return;
+    }
+
+    fetch(`${API_BASE}/api/attractions/${attractionId}/vote`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: parseInt(USER_ID) })
+    })
+    .then(res => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    })
+    .then(updatedAttraction => {
+      // Aktualizuj liczbę głosów w state
+      setTrips(prevTrips => prevTrips.map(trip => {
+        if (trip.id !== tripId) return trip;
+        return {
+          ...trip,
+          attractions: trip.attractions.map(attr => 
+            attr.id === attractionId ? { ...attr, votes: updatedAttraction.votes } : attr
+          )
+        };
+      }));
+      // Usuń z listy głosów użytkownika
+      setUserVotedAttractions(prev => prev.filter(id => id !== attractionId));
+    })
+    .catch(err => console.error("Błąd cofania głosu:", err));
   };
 
   // --- OBSŁUGA PAKOWANIA ---
@@ -354,9 +420,11 @@ export default function Dashboard() {
           setActiveTab={setActiveTab}
           setSelectedTrip={() => setSelectedTripId(null)}
           handleVote={handleVote}
+          handleUnvote={handleUnvote}
           togglePacking={togglePacking}
           addPackingItem={addPackingItem}
           refreshTrip={refreshTrip}
+          userVotedAttractions={userVotedAttractions}
         />
       </div>
     </>
