@@ -461,5 +461,38 @@ def add_trip_attraction(trip_id):
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/trips/<int:trip_id>/schedule', methods=['PUT'])
+def update_trip_schedule(trip_id):
+    """Aktualizuj harmonogram wycieczki"""
+    data = request.json or {}
+    schedule = data.get('schedule', [])
+    
+    if not isinstance(schedule, list):
+        return jsonify({'status': 'error', 'message': 'schedule must be a list'}), 400
+    
+    conn = Database().get_connection()
+    try:
+        # Usuń stare elementy harmonogramu dla tego tripa
+        conn.execute('DELETE FROM schedule_items WHERE trip_id = ?', (trip_id,))
+        
+        # Dodaj nowe elementy harmonogramu
+        for item in schedule:
+            day = item.get('day')
+            attraction_id = item.get('attraction_id')
+            attraction_name = item.get('attraction_name')
+            time = item.get('time', '09:00')
+            notes = item.get('notes', '')
+            
+            conn.execute(
+                '''INSERT INTO schedule_items (trip_id, time, activity) 
+                   VALUES (?, ?, ?)''',
+                (trip_id, time, f"{attraction_name}|day:{day}|notes:{notes}|attr_id:{attraction_id}")
+            )
+        
+        conn.commit()
+        return jsonify({'status': 'success', 'message': 'Schedule saved'}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)

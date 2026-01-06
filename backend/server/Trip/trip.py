@@ -25,6 +25,22 @@ class Trip:
 
     # Helper do API
     def to_dict(self):
+        # Serializuj schedule - obsłuż zarówno ScheduleItem jak i dynamiczne obiekty
+        schedule_list = []
+        for s in self.schedule:
+            if hasattr(s, 'to_dict'):
+                schedule_list.append(s.to_dict())
+            else:
+                # Dynamiczny obiekt z atrybutami
+                schedule_list.append({
+                    "id": getattr(s, 'id', None),
+                    "day": getattr(s, 'day', 0),
+                    "attraction_id": getattr(s, 'attraction_id', None),
+                    "attraction_name": getattr(s, 'attraction_name', ''),
+                    "time": getattr(s, 'time', '09:00'),
+                    "notes": getattr(s, 'notes', '')
+                })
+        
         return {
             "id": self.id,
             "title": self.title,
@@ -33,7 +49,7 @@ class Trip:
             "end_date": self.end_date,
             "budget": self.total_budget_limit,
             "attractions": [a.to_dict() for a in self.attractions],
-            "schedule": [s.to_dict() for s in self.schedule],
+            "schedule": schedule_list,
             "packingList": [p.to_dict() for p in self.packing_list],
             "members": [{"user_id": m.id, "username": m.username, "role": m.role} for m in self.members]
         }

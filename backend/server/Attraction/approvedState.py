@@ -10,8 +10,6 @@ class ApprovedState(AttractionState):
         print("Już jest zatwierdzona.")
 
     def reject(self, attraction):
-        # Biznesowa decyzja: Czy można odrzucić coś już zatwierdzonego? 
-        # Załóżmy, że tak (np. brak budżetu w ostatniej chwili).
         from Attraction.rejectedState import RejectedState
         print("Cofanie zatwierdzenia...")
         attraction.change_state(RejectedState())

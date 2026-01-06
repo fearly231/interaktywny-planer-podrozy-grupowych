@@ -63,11 +63,36 @@ class TripRepository:
             m.role = r['role']
             trip.members.append(m)
         # load schedule
-        rows = cur.execute('SELECT id, trip_id, time, activity FROM schedule_items WHERE trip_id=? ORDER BY id', (id,)).fetchall()
+        rows = cur.execute('SELECT id, trip_id, time, activity FROM schedule_items WHERE trip_id=? ORDER BY time', (id,)).fetchall()
         for r in rows:
-            s = ScheduleItem.from_row(r)
-            if s:
-                trip.schedule.append(s)
+            # Parse activity field which contains: "attraction_name|day:X|notes:Y|attr_id:Z"
+            activity_str = r['activity'] or ''
+            parts = activity_str.split('|')
+            
+            # Stwórz obiekt harmonogramu w formacie który frontend oczekuje
+            schedule_obj = type('S', (), {})()
+            schedule_obj.id = r['id']
+            schedule_obj.time = r['time']
+            schedule_obj.attraction_name = parts[0] if len(parts) > 0 else activity_str
+            
+            # Wyciągnij day, notes, attraction_id
+            for part in parts[1:]:
+                if part.startswith('day:'):
+                    schedule_obj.day = int(part.split(':')[1])
+                elif part.startswith('notes:'):
+                    schedule_obj.notes = part.split(':', 1)[1] if ':' in part else ''
+                elif part.startswith('attr_id:'):
+                    schedule_obj.attraction_id = int(part.split(':')[1])
+            
+            # Ustaw domyślne wartości jeśli brak
+            if not hasattr(schedule_obj, 'day'):
+                schedule_obj.day = 0
+            if not hasattr(schedule_obj, 'notes'):
+                schedule_obj.notes = ''
+            if not hasattr(schedule_obj, 'attraction_id'):
+                schedule_obj.attraction_id = None
+                
+            trip.schedule.append(schedule_obj)
         # load packing
         rows = cur.execute('SELECT id, trip_id, user_id, item_name, is_checked FROM packing_items WHERE trip_id=? ORDER BY id', (id,)).fetchall()
         for r in rows:

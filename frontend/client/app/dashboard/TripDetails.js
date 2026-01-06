@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import PackingList from './PackingList';
 import AttractionsList from './AttractionsList';
+import AttractionsVoting from './AttractionsVoting';
+import ScheduleBuilder from './ScheduleBuilder';
 import Schedule from './Schedule';
 
 export default function TripDetails({ selectedTrip, activeTab, setActiveTab, setSelectedTrip, handleVote, togglePacking, addPackingItem, refreshTrip }) {
@@ -148,7 +150,7 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
             {/* Treść Zakładek */}
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 min-h-[400px]">
           {activeTab === 'harmonogram' && (
-            <Schedule schedule={selectedTrip.schedule} />
+            <ScheduleBuilder trip={selectedTrip} attractions={selectedTrip.attractions} />
           )}
           {activeTab === 'pakowanie' && (
             <PackingList packingList={selectedTrip.packingList} togglePacking={togglePacking} addPackingItem={addPackingItem} />
@@ -177,8 +179,13 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
                 </div>
               </div>
               
-              {/* Lista atrakcji */}
-              <AttractionsList attractions={selectedTrip.attractions} handleVote={handleVote} tripId={selectedTrip.id} />
+              {/* System głosowania na atrakcje */}
+              <AttractionsVoting 
+                attractions={selectedTrip.attractions}
+                totalMembers={selectedTrip.members?.length || 0}
+                handleVote={handleVote}
+                tripId={selectedTrip.id}
+              />
             </div>
           )}
             </div>
