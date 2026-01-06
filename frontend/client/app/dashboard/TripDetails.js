@@ -102,7 +102,7 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Pasek nawigacji powrotu */}
-      <div className="bg-white border-b px-8 py-4 flex items-center justify-between shadow-sm sticky top-0 z-10">
+      <div className="bg-white border-b px-8 rounded-lg py-4 flex items-center justify-between shadow-sm sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => {
@@ -146,7 +146,7 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
             </div>
 
             {/* Treść Zakładek */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-h-[400px]">
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 min-h-[400px]">
           {activeTab === 'harmonogram' && (
             <Schedule schedule={selectedTrip.schedule} />
           )}

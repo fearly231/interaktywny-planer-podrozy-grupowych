@@ -201,7 +201,7 @@ export default function NewTripForm({ onCreate }) {
   const formError = touched && validate();
 
   return (
-    <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
+    <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8 rounded-lg">
       <form onSubmit={handleCreate} className="max-w-4xl mx-auto p-6">
         {/* Header */}
         <div className="mb-8">
