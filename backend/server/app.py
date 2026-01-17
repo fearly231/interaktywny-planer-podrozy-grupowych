@@ -66,6 +66,25 @@ def register_user():
         return jsonify({"status": "error", "message": str(e)}), 500
     return jsonify({"status": "success"}), 201
 
+@app.route('/api/users/check', methods=['POST'])
+def check_user_exists():
+    """Sprawdź czy użytkownik istnieje w bazie danych"""
+    data = request.json or {}
+    username = data.get('username')
+    if not username:
+        return jsonify({"status": "error", "message": "username required"}), 400
+    
+    db = Database()
+    conn = db.get_connection()
+    try:
+        user = conn.execute('SELECT id, username FROM users WHERE username = ?', (username,)).fetchone()
+        if user:
+            return jsonify({"status": "success", "exists": True, "username": user['username']}), 200
+        else:
+            return jsonify({"status": "error", "exists": False, "message": f"Użytkownik '{username}' nie istnieje w systemie"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/data', methods=['GET'])
 def get_dashboard_data():
     return jsonify({

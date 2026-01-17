@@ -20,6 +20,7 @@ export default function NewTripForm({ onCreate }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [memberError, setMemberError] = useState('');
   const [touched, setTouched] = useState(false);
 
   const titleRef = useRef(null);
@@ -36,17 +37,43 @@ export default function NewTripForm({ onCreate }) {
     setAttractions(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const addMember = () => {
+  const addMember = async () => {
     setTouched(true);
     const username = memberUsername.trim();
     if (!username) return;
+    
+    // Sprawdź czy użytkownik już jest na liście
     if (members.some(m => m.username.toLowerCase() === username.toLowerCase())) {
-      setError('Użytkownik już dodany.');
-      setTimeout(() => setError(''), 2500);
+      setMemberError('Użytkownik już dodany.');
+      setTimeout(() => setMemberError(''), 2500);
       return;
     }
-    setMembers(prev => [...prev, { username }]);
-    setMemberUsername('');
+
+    // Sprawdź czy użytkownik istnieje w bazie danych
+    try {
+      const res = await fetch('http://localhost:5001/api/users/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok || !data.exists) {
+        setMemberError(data.message || `Użytkownik '${username}' nie istnieje w systemie`);
+        setTimeout(() => setMemberError(''), 3000);
+        return;
+      }
+      
+      // Użytkownik istnieje - dodaj do listy
+      setMembers(prev => [...prev, { username: data.username }]);
+      setMemberUsername('');
+      setMemberError('');
+    } catch (err) {
+      console.error('Błąd sprawdzania użytkownika:', err);
+      setMemberError('Błąd połączenia z serwerem');
+      setTimeout(() => setMemberError(''), 2500);
+    }
   };
 
   const removeMember = (idx) => {
@@ -161,9 +188,19 @@ export default function NewTripForm({ onCreate }) {
             if (data.members) {
               updatedMembers = data.members;
             }
+          } else {
+            // Obsłuż błąd z serwera
+            const errorData = await res.json().catch(() => ({}));
+            const errorMsg = errorData.message || 'Nie udało się dodać członka';
+            setMemberError(`Błąd dodawania użytkownika "${m.username}": ${errorMsg}`);
+            setLoading(false);
+            return;
           }
         } catch (err) {
           console.warn('Nie udało się dodać członka', m, err);
+          setMemberError(`Błąd połączenia podczas dodawania użytkownika "${m.username}"`);
+          setLoading(false);
+          return;
         }
       }
 
@@ -379,6 +416,15 @@ export default function NewTripForm({ onCreate }) {
                     +
                   </button>
                 </div>
+
+                {memberError && (
+                  <div className="mb-3 p-3 bg-red-50 border-l-4 border-red-500 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">⚠️</span>
+                      <span className="text-red-700 text-sm font-medium">{memberError}</span>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2 bg-gray-50 rounded-lg p-4 min-h-[120px]">
                   {members.length ? (

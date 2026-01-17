@@ -93,7 +93,14 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
         await refreshTrip(selectedTrip.id);
       } else {
         const error = await res.json();
-        alert(error.message || 'Nie udało się dodać uczestnika');
+        // Wyświetl przyjazny komunikat błędu
+        if (error.message === 'user not found') {
+          alert('Taki użytkownik nie istnieje');
+        } else if (error.message === 'user already a member') {
+          alert('Ten użytkownik jest już uczestnikiem wycieczki');
+        } else {
+          alert(error.message || 'Nie udało się dodać uczestnika');
+        }
       }
     } catch (err) {
       console.error('Nie udało się dodać uczestnika', err);
