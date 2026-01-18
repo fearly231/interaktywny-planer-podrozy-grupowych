@@ -94,6 +94,18 @@ class Database:
                 )
             ''')
 
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    trip_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    message TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    FOREIGN KEY (trip_id) REFERENCES trips(id),
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            ''')
+
             cur.execute("PRAGMA table_info(trips)")
             cols = [r['name'] for r in cur.fetchall()]
             if 'owner_user_id' not in cols:

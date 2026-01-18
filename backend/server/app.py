@@ -10,6 +10,7 @@ from entities.packingItem import PackingItem
 from repository.tripRepository import TripRepository
 from repository.attractionRepository import AttractionRepository
 from repository.userRepository import UserRepository
+from repository.chatRepository import ChatRepository
 from builder.tripBuilder import TripBuilder
 from entities.user import User
 
@@ -478,6 +479,70 @@ def update_trip(trip_id):
         # Zwróć zaktualizowaną wycieczkę
         repo = TripRepository()
         trip = repo.get_by_id(trip_id)
+        
+        if trip:
+            return jsonify({'status': 'success', 'trip': trip.to_dict()}), 200
+        else:
+            return jsonify({'status': 'error', 'message': 'Trip not found'}), 404
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/trips/<int:trip_id>', methods=['DELETE'])
+def delete_trip(trip_id):
+    """Usuń wycieczkę - tylko moderator"""
+    data = request.json or {}
+    requester_id = data.get('requester_id')
+    
+    if not requester_id:
+        return jsonify({'status': 'error', 'message': 'requester_id required'}), 400
+    
+    conn = Database().get_connection()
+    
+    try:
+        # Sprawdź czy użytkownik jest moderatorem
+        member = conn.execute(
+            'SELECT role FROM trip_members WHERE trip_id = ? AND user_id = ?',
+            (trip_id, requester_id)
+        ).fetchone()
+        
+        if not member or member['role'] != 'moderator':
+            return jsonify({'status': 'error', 'message': 'Only moderator can delete trip'}), 403
+        
+        # Usuń powiązane dane w odpowiedniej kolejności
+        # 1. Usuń głosy na atrakcje
+        conn.execute(
+            '''DELETE FROM attraction_votes 
+               WHERE attraction_id IN (SELECT id FROM trip_attractions WHERE trip_id = ?)''',
+            (trip_id,)
+        )
+        
+        # 2. Usuń atrakcje
+        conn.execute('DELETE FROM trip_attractions WHERE trip_id = ?', (trip_id,))
+        
+        # 3. Usuń wiadomości czatu
+        conn.execute('DELETE FROM chat_messages WHERE trip_id = ?', (trip_id,))
+        
+        # 4. Usuń listę pakowania
+        conn.execute('DELETE FROM packing_items WHERE trip_id = ?', (trip_id,))
+        
+        # 5. Usuń harmonogram
+        conn.execute('DELETE FROM schedule_items WHERE trip_id = ?', (trip_id,))
+        
+        # 6. Usuń członków
+        conn.execute('DELETE FROM trip_members WHERE trip_id = ?', (trip_id,))
+        
+        # 7. Usuń samą wycieczkę
+        conn.execute('DELETE FROM trips WHERE id = ?', (trip_id,))
+        
+        conn.commit()
+        
+        return jsonify({'status': 'success', 'message': 'Trip deleted successfully'}), 200
+            
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+        trip = repo.get_by_id(trip_id)
         return jsonify(trip.to_dict()), 200
         
     except Exception as e:
@@ -676,6 +741,65 @@ def get_user_votes(trip_id):
         
         voted_ids = [row['attraction_id'] for row in rows]
         return jsonify({'status': 'success', 'voted_attractions': voted_ids}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/trips/<int:trip_id>/chat/messages', methods=['GET'])
+def get_chat_messages(trip_id):
+    """Pobierz wiadomości czatu dla danej wycieczki"""
+    try:
+        limit = int(request.args.get('limit', 100))
+        chat_repo = ChatRepository()
+        messages = chat_repo.get_messages_by_trip(trip_id, limit)
+        
+        return jsonify({
+            'status': 'success',
+            'messages': [msg.to_dict() for msg in messages]
+        }), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/trips/<int:trip_id>/chat/messages', methods=['POST'])
+def add_chat_message(trip_id):
+    """Dodaj nową wiadomość do czatu"""
+    data = request.json or {}
+    user_id = data.get('user_id')
+    message = data.get('message', '').strip()
+    
+    if not user_id or not message:
+        return jsonify({'status': 'error', 'message': 'user_id and message required'}), 400
+    
+    try:
+        chat_repo = ChatRepository()
+        new_message = chat_repo.add_message(trip_id, user_id, message)
+        
+        if new_message:
+            return jsonify({
+                'status': 'success',
+                'message': new_message.to_dict()
+            }), 201
+        else:
+            return jsonify({'status': 'error', 'message': 'Failed to create message'}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/trips/<int:trip_id>/chat/messages/<int:message_id>', methods=['DELETE'])
+def delete_chat_message(trip_id, message_id):
+    """Usuń wiadomość z czatu (tylko własną)"""
+    data = request.json or {}
+    user_id = data.get('user_id')
+    
+    if not user_id:
+        return jsonify({'status': 'error', 'message': 'user_id required'}), 400
+    
+    try:
+        chat_repo = ChatRepository()
+        success = chat_repo.delete_message(message_id, user_id)
+        
+        if success:
+            return jsonify({'status': 'success', 'message': 'Message deleted'}), 200
+        else:
+            return jsonify({'status': 'error', 'message': 'Message not found or unauthorized'}), 404
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
