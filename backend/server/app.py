@@ -5,12 +5,11 @@ import jwt
 import datetime
 
 from db.db import Database 
-from scheduleItem import ScheduleItem
-from packingItem import PackingItem
-from Attraction.attraction import Attraction
-from Trip.tripRepository import TripRepository
-from Trip.tripBuilder import TripBuilder
-from users.user import User
+from entities.scheduleItem import ScheduleItem
+from entities.packingItem import PackingItem
+from repository.tripRepository import TripRepository
+from builder.tripBuilder import TripBuilder
+from entities.user import User
 
 app = Flask(__name__)
 CORS(app)
@@ -91,10 +90,6 @@ def get_dashboard_data():
         "message": "Witaj w planerze!",
         "stats": {"planned_trips": 0, "visited_countries": 0}
     })
-
-
-@app.route('/api/trips', methods=['GET'])
-
 
 @app.route('/api/trips', methods=['GET'])
 def get_trips():

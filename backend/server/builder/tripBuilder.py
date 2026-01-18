@@ -1,4 +1,4 @@
-from Trip.trip import Trip
+from entities.trip import Trip
 
 class TripBuilder:
     def __init__(self):

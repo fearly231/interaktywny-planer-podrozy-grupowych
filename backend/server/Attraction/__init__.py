@@ -1,1 +1,0 @@
-# Plik inicjalizujący pakiet Attraction

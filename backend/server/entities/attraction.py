@@ -1,5 +1,5 @@
-from Attraction.attractionState import AttractionState
-from Attraction.proposedState import ProposedState
+from states.attractionState import AttractionState
+from states.proposedState import ProposedState
 
 class Attraction:
     def __init__(self, id, name: str, type: str, note: str = ""):

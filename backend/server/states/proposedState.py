@@ -1,4 +1,4 @@
-from Attraction.attractionState import AttractionState
+from states.attractionState import AttractionState
 
 class ProposedState(AttractionState):
 
@@ -11,10 +11,10 @@ class ProposedState(AttractionState):
 
     def approve(self, attraction):
         # Przejście do stanu Zatwierdzonego
-        from Attraction.approvedState import ApprovedState
+        from states.approvedState import ApprovedState
         attraction.change_state(ApprovedState())
 
     def reject(self, attraction):
         # Przejście do stanu Odrzuconego
-        from Attraction.rejectedState import RejectedState
+        from states.rejectedState import RejectedState
         attraction.change_state(RejectedState())

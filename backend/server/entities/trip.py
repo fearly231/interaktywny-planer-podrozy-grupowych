@@ -1,4 +1,4 @@
-from Attraction.attraction import Attraction
+from entities.attraction import Attraction
 
 class Trip:
     def __init__(self, id, title, start_date, end_date, budget_limit):

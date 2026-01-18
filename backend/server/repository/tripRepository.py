@@ -1,8 +1,8 @@
 from db.db import Database
-from Trip.trip import Trip
-from Attraction.attraction import Attraction
-from scheduleItem import ScheduleItem
-from packingItem import PackingItem
+from entities.trip import Trip
+from entities.attraction import Attraction
+from entities.scheduleItem import ScheduleItem
+from entities.packingItem import PackingItem
 
 class TripRepository:
     def __init__(self):

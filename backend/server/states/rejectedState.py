@@ -1,4 +1,4 @@
-from Attraction.attractionState import AttractionState
+from states.attractionState import AttractionState
 # USUŃ IMPORTY INNYCH STANÓW Z GÓRY
 
 class RejectedState(AttractionState):
@@ -10,7 +10,7 @@ class RejectedState(AttractionState):
         
     def approve(self, attraction):
         # IMPORT WEWNĄTRZ METODY
-        from Attraction.approvedState import ApprovedState
+        from states.approvedState import ApprovedState
         print("Przywracanie -> Zatwierdzone")
         attraction.change_state(ApprovedState())
 
