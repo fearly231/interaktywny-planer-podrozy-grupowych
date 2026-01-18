@@ -5,6 +5,7 @@ import AttractionsVoting from './AttractionsVoting';
 import ScheduleBuilder from './ScheduleBuilder';
 import Schedule from './Schedule';
 import EditTripModal from './EditTripModal';
+import ChatWidget from './ChatWidget';
 
 export default function TripDetails({ selectedTrip, activeTab, setActiveTab, setSelectedTrip, handleVote, handleUnvote, togglePacking, addPackingItem, refreshTrip, userVotedAttractions }) {
   const [newAttractionName, setNewAttractionName] = useState('');
@@ -428,6 +429,9 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
           onSave={handleEditTrip}
         />
       )}
+
+      {/* Chat Widget */}
+      <ChatWidget tripId={selectedTrip.id} />
     </div>
   );
 }
