@@ -16,8 +16,26 @@ class Trip:
 
     # Metody biznesowe z diagramu UML
     def calculate_total_estimated_cost(self):
-        # Tu w przyszłości zsumujesz koszty atrakcji i inne wydatki
-        pass
+        """Oblicz całkowity koszt zatwierdzonych atrakcji"""
+        total = 0.0
+        for attraction in self.attractions:
+            # Tylko zatwierdzone atrakcje liczą się do budżetu
+            if attraction._state.get_status_name() == "Zatwierdzone":
+                total += attraction.cost
+        return total
+    
+    def get_budget_summary(self):
+        """Zwróć podsumowanie budżetu"""
+        spent = self.calculate_total_estimated_cost()
+        remaining = self.total_budget_limit - spent
+        percentage = (spent / self.total_budget_limit * 100) if self.total_budget_limit > 0 else 0
+        
+        return {
+            "total_budget": self.total_budget_limit,
+            "spent": spent,
+            "remaining": remaining,
+            "percentage_used": round(percentage, 1)
+        }
 
     def sort_attractions(self, strategy):
         # Wykorzystujemy Twój wzorzec Strategy
@@ -48,6 +66,7 @@ class Trip:
             "start_date": self.start_date,
             "end_date": self.end_date,
             "budget": self.total_budget_limit,
+            "budget_summary": self.get_budget_summary(),  # Dodaj podsumowanie budżetu
             "attractions": [a.to_dict() for a in self.attractions],
             "schedule": schedule_list,
             "packingList": [p.to_dict() for p in self.packing_list],

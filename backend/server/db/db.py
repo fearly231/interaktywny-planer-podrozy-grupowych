@@ -79,7 +79,9 @@ class Database:
                     trip_id INTEGER NOT NULL,
                     name TEXT NOT NULL,
                     type TEXT,
-                    note TEXT
+                    note TEXT,
+                    cost REAL DEFAULT 0,
+                    link TEXT
                 )
             ''')
 
@@ -115,6 +117,38 @@ class Database:
                     cur.execute('ALTER TABLE schedule_items ADD COLUMN trip_id INTEGER')
                 except Exception:
                     pass
+
+            # Dodaj pole cost (koszt) do trip_attractions
+            cur.execute("PRAGMA table_info(trip_attractions)")
+            cols = [r['name'] for r in cur.fetchall()]
+            if 'cost' not in cols:
+                try:
+                    cur.execute('ALTER TABLE trip_attractions ADD COLUMN cost REAL DEFAULT 0')
+                except Exception as e:
+                    print(f"Error adding cost column: {e}")
+            
+            # Ponownie pobierz listę kolumn po dodaniu cost
+            cur.execute("PRAGMA table_info(trip_attractions)")
+            cols = [r['name'] for r in cur.fetchall()]
+            
+            # Dodaj pole link do trip_attractions
+            if 'link' not in cols:
+                try:
+                    cur.execute('ALTER TABLE trip_attractions ADD COLUMN link TEXT')
+                except Exception as e:
+                    print(f"Error adding link column: {e}")
+            
+            # Ponownie pobierz listę kolumn po dodaniu link
+            cur.execute("PRAGMA table_info(trip_attractions)")
+            cols = [r['name'] for r in cur.fetchall()]
+            
+            # Dodaj pole status do trip_attractions (stan atrakcji)
+            if 'status' not in cols:
+                try:
+                    cur.execute('ALTER TABLE trip_attractions ADD COLUMN status TEXT DEFAULT "Propozycja"')
+                    print("✅ Dodano kolumnę 'status' do trip_attractions")
+                except Exception as e:
+                    print(f"Error adding status column: {e}")
 
             cur.execute("SELECT * FROM users WHERE username = ?", ('podroznik',))
             if cur.fetchone() is None:

@@ -2,11 +2,13 @@ from states.attractionState import AttractionState
 from states.proposedState import ProposedState
 
 class Attraction:
-    def __init__(self, id, name: str, type: str, note: str = ""):
+    def __init__(self, id, name: str, type: str, note: str = "", cost: float = 0.0, link: str = None):
         self.id = id
         self.name = name
         self.type = type
         self.note = note
+        self.cost = cost  # Koszt atrakcji
+        self.link = link  # Opcjonalny link (np. do strony biletu)
         self.votes = 0
         # Domyślny stan na start to "Proposed" (Propozycja)
         self._state: AttractionState = ProposedState()
@@ -34,6 +36,8 @@ class Attraction:
             "name": self.name,
             "type": self.type,
             "note": self.note,
+            "cost": self.cost,
+            "link": self.link,
             "votes": self.votes,
             "status": self._state.get_status_name()
         }

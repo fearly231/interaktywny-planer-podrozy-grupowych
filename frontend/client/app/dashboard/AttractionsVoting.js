@@ -2,7 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-export default function AttractionsVoting({ attractions, totalMembers, handleVote, handleUnvote, tripId, userVotedAttractions }) {
+export default function AttractionsVoting({ attractions, totalMembers, handleVote, handleUnvote, tripId, userVotedAttractions, isModerator, onDeleteAttraction }) {
   // Oblicz procent głosów
   const getVotePercentage = (votes) => {
     if (totalMembers === 0) return 0;
@@ -14,12 +14,12 @@ export default function AttractionsVoting({ attractions, totalMembers, handleVot
     return userVotedAttractions && userVotedAttractions.includes(attractionId);
   };
 
-  // Podziel atrakcje na zatwierdzone (>50%) i do rozważenia
+  // Podziel atrakcje na zatwierdzone i do rozważenia (używając statusu z backendu)
   const approvedAttractions = attractions.filter(
-    a => getVotePercentage(a.votes) > 50
+    a => a.status === "Zatwierdzone"
   );
   const pendingAttractions = attractions.filter(
-    a => getVotePercentage(a.votes) <= 50
+    a => a.status !== "Zatwierdzone"
   );
 
   // Sortuj po liczbie głosów (malejąco)
@@ -46,6 +46,24 @@ export default function AttractionsVoting({ attractions, totalMembers, handleVot
               <h3 className="font-semibold text-gray-800">{attraction.name}</h3>
               {attraction.note && (
                 <p className="text-xs text-gray-500 italic mt-1">"{attraction.note}"</p>
+              )}
+              {/* Koszt atrakcji */}
+              {attraction.cost > 0 && (
+                <p className="text-sm text-green-600 font-semibold mt-1">
+                  💰 {attraction.cost.toFixed(2)} PLN
+                </p>
+              )}
+              {/* Link do atrakcji */}
+              {attraction.link && (
+                <a 
+                  href={attraction.link} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-500 hover:text-blue-700 underline mt-1 inline-block"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  🔗 Zobacz szczegóły
+                </a>
               )}
             </div>
             <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
@@ -89,19 +107,30 @@ export default function AttractionsVoting({ attractions, totalMembers, handleVot
 
           {/* Actions */}
           <div className="flex gap-2">
-            {hasUserVoted(attraction.id) ? (
+            <div className="flex-1">
+              {hasUserVoted(attraction.id) ? (
+                <button
+                  onClick={() => handleUnvote(tripId, attraction.id)}
+                  className="w-full px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition"
+                >
+                  ✕ Cofnij głos
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleVote(tripId, attraction.id)}
+                  className="w-full px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition"
+                >
+                  👍 Głosuj
+                </button>
+              )}
+            </div>
+            {isModerator && (
               <button
-                onClick={() => handleUnvote(tripId, attraction.id)}
-                className="w-full px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition"
+                onClick={() => onDeleteAttraction(attraction.id, attraction.name)}
+                className="px-3 py-2 bg-gray-200 hover:bg-red-100 text-red-600 text-sm font-semibold rounded-lg transition"
+                title="Usuń atrakcję"
               >
-                ✕ Cofnij głos
-              </button>
-            ) : (
-              <button
-                onClick={() => handleVote(tripId, attraction.id)}
-                className="w-full px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition"
-              >
-                👍 Głosuj
+                🗑️
               </button>
             )}
           </div>

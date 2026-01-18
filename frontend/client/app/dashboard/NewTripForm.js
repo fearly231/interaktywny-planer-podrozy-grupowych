@@ -4,6 +4,8 @@ export default function NewTripForm({ onCreate }) {
   const [title, setTitle] = useState('');
   const [budget, setBudget] = useState('');
   const [attractionName, setAttractionName] = useState('');
+  const [attractionCost, setAttractionCost] = useState('');
+  const [attractionLink, setAttractionLink] = useState('');
   const [attractions, setAttractions] = useState([]);
   const [memberUsername, setMemberUsername] = useState('');
   const [members, setMembers] = useState([]);
@@ -29,8 +31,18 @@ export default function NewTripForm({ onCreate }) {
     setTouched(true);
     const name = attractionName.trim();
     if (!name) return;
-    setAttractions(prev => [...prev, { name }]);
+    
+    const cost = parseFloat(attractionCost) || 0;
+    const link = attractionLink.trim();
+    
+    setAttractions(prev => [...prev, { 
+      name, 
+      cost,
+      link: link || null
+    }]);
     setAttractionName('');
+    setAttractionCost('');
+    setAttractionLink('');
   };
 
   const removeAttraction = (idx) => {
@@ -161,7 +173,11 @@ export default function NewTripForm({ onCreate }) {
           const res = await fetch(`http://localhost:5001/api/trips/${trip.id}/attractions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: a.name })
+            body: JSON.stringify({ 
+              name: a.name,
+              cost: a.cost || 0,
+              link: a.link || null
+            })
           });
           if (res.ok) {
             const data = await res.json();
@@ -357,29 +373,67 @@ export default function NewTripForm({ onCreate }) {
               {/* Attractions */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">Atrakcje</label>
-                <div className="flex gap-2 mb-4">
+                
+                {/* Nazwa atrakcji */}
+                <div className="mb-3">
                   <input
                     value={attractionName}
                     onChange={e => setAttractionName(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAttraction(); } }}
-                    className="flex-1 px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg focus:bg-white focus:border-blue-500 focus:outline-none text-gray-800 placeholder-gray-400 transition"
-                    placeholder="np. Morskie Oko"
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addAttraction(); } }}
+                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg focus:bg-white focus:border-blue-500 focus:outline-none text-gray-800 placeholder-gray-400 transition"
+                    placeholder="Nazwa atrakcji (np. Morskie Oko)"
                   />
-                  <button
-                    type="button"
-                    onClick={addAttraction}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition transform hover:scale-105 active:scale-95"
-                  >
-                    +
-                  </button>
                 </div>
+                
+                {/* Koszt i Link w jednym wierszu */}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <input
+                    type="number"
+                    value={attractionCost}
+                    onChange={e => setAttractionCost(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAttraction(); } }}
+                    className="px-4 py-2 bg-gray-50 border-2 border-gray-200 rounded-lg focus:bg-white focus:border-blue-500 focus:outline-none text-gray-800 placeholder-gray-400 transition text-sm"
+                    placeholder="Koszt (PLN)"
+                    min="0"
+                    step="0.01"
+                  />
+                  <input
+                    type="url"
+                    value={attractionLink}
+                    onChange={e => setAttractionLink(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAttraction(); } }}
+                    className="px-4 py-2 bg-gray-50 border-2 border-gray-200 rounded-lg focus:bg-white focus:border-blue-500 focus:outline-none text-gray-800 placeholder-gray-400 transition text-sm"
+                    placeholder="Link (opcjonalnie)"
+                  />
+                </div>
+                
+                {/* Przycisk dodaj */}
+                <button
+                  type="button"
+                  onClick={addAttraction}
+                  className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition transform hover:scale-[1.02] active:scale-95"
+                >
+                  + Dodaj atrakcję
+                </button>
 
-                <div className="space-y-2 bg-gray-50 rounded-lg p-4 min-h-[120px]">
+                <div className="space-y-2 bg-gray-50 rounded-lg p-4 min-h-[120px] mt-4">
                   {attractions.length ? (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="space-y-2">
                       {attractions.map((a, i) => (
-                        <div key={i} className="group flex items-center gap-2 bg-gradient-to-r from-blue-100 to-blue-50 text-blue-800 px-4 py-2 rounded-full shadow-sm hover:shadow-md transition border border-blue-200">
-                          <span className="text-sm font-medium">{a.name}</span>
+                        <div key={i} className="group flex items-center justify-between bg-white text-gray-800 px-4 py-3 rounded-lg shadow-sm hover:shadow-md transition border border-gray-200">
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{a.name}</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {a.cost > 0 && <span className="font-semibold text-blue-600">{a.cost} PLN</span>}
+                              {a.link && (
+                                <span className="ml-2">
+                                  <a href={a.link} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                                    🔗 Link
+                                  </a>
+                                </span>
+                              )}
+                            </div>
+                          </div>
                           <button
                             type="button"
                             onClick={() => removeAttraction(i)}

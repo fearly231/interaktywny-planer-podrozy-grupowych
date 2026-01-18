@@ -113,16 +113,11 @@ export default function Dashboard() {
     if (!USER_ID) return;
 
     try {
-      const trip = trips.find(t => t.id === tripId);
-      if (!trip || !trip.attractions) return;
-
-      // Sprawdź które atrakcje użytkownik zagłosował
-      // Tymczasowo używamy informacji z attractions (votes)
-      // W przyszłości można dodać endpoint do sprawdzania głosów użytkownika
-      const votedIds = [];
-      // Backend nie ma jeszcze endpointu do sprawdzania głosów użytkownika
-      // Więc tymczasowo będziemy śledzić to lokalnie po akcjach głosowania
-      setUserVotedAttractions(votedIds);
+      const res = await fetch(`${API_BASE}/api/trips/${tripId}/user-votes?user_id=${USER_ID}`);
+      if (res.ok) {
+        const data = await res.json();
+        setUserVotedAttractions(data.voted_attractions || []);
+      }
     } catch (err) {
       console.error('Błąd ładowania głosów użytkownika', err);
     }
@@ -158,18 +153,21 @@ export default function Dashboard() {
     })
     .then(updatedAttraction => {
       if (!updatedAttraction) return; // 409 case
-      // Aktualizuj liczbę głosów w state
+      // Aktualizuj całą atrakcję (włącznie ze statusem!) w state
       setTrips(prevTrips => prevTrips.map(trip => {
         if (trip.id !== tripId) return trip;
         return {
           ...trip,
           attractions: trip.attractions.map(attr => 
-            attr.id === attractionId ? { ...attr, votes: updatedAttraction.votes } : attr
+            attr.id === attractionId ? updatedAttraction : attr
           )
         };
       }));
       // Dodaj do listy głosów użytkownika
       setUserVotedAttractions(prev => [...prev, attractionId]);
+      
+      // Opcjonalnie: pełne odświeżenie tripa z backendu dla pewności
+      refreshTrip(tripId);
     })
     .catch(err => console.error("Błąd głosowania:", err));
   };
@@ -192,18 +190,21 @@ export default function Dashboard() {
       return res.json();
     })
     .then(updatedAttraction => {
-      // Aktualizuj liczbę głosów w state
+      // Aktualizuj całą atrakcję (włącznie ze statusem!) w state
       setTrips(prevTrips => prevTrips.map(trip => {
         if (trip.id !== tripId) return trip;
         return {
           ...trip,
           attractions: trip.attractions.map(attr => 
-            attr.id === attractionId ? { ...attr, votes: updatedAttraction.votes } : attr
+            attr.id === attractionId ? updatedAttraction : attr
           )
         };
       }));
       // Usuń z listy głosów użytkownika
       setUserVotedAttractions(prev => prev.filter(id => id !== attractionId));
+      
+      // Opcjonalnie: pełne odświeżenie tripa z backendu dla pewności
+      refreshTrip(tripId);
     })
     .catch(err => console.error("Błąd cofania głosu:", err));
   };

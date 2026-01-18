@@ -163,6 +163,20 @@ def vote_attraction(attr_id):
     
     # Pobierz zaktualizowaną atrakcję z nowymi głosami
     attraction = repo.get_by_id(attr_id)
+    
+    # Sprawdź, czy atrakcja powinna zostać automatycznie zatwierdzona (>50% głosów)
+    conn = Database().get_connection()
+    members_count = conn.execute(
+        'SELECT COUNT(*) as count FROM trip_members WHERE trip_id = (SELECT trip_id FROM trip_attractions WHERE id = ?)',
+        (attr_id,)
+    ).fetchone()['count']
+    
+    # Jeśli ma >50% głosów, zatwierdź automatycznie
+    if members_count > 0 and (attraction.votes / members_count) > 0.5:
+        attraction.approve()
+        repo.update_status(attr_id, attraction._state.get_status_name())  # Zapisz stan w bazie
+        print(f"✅ Atrakcja '{attraction.name}' została automatycznie zatwierdzona ({attraction.votes}/{members_count} głosów)")
+    
     return jsonify(attraction.to_dict())
 
 @app.route('/api/attractions/<int:attr_id>/vote', methods=['DELETE'])
@@ -187,6 +201,22 @@ def unvote_attraction(attr_id):
     
     # Pobierz zaktualizowaną atrakcję z nowymi głosami
     attraction = repo.get_by_id(attr_id)
+    
+    # Sprawdź, czy atrakcja powinna zostać przywrócona do stanu propozycji (<=50% głosów)
+    conn = Database().get_connection()
+    members_count = conn.execute(
+        'SELECT COUNT(*) as count FROM trip_members WHERE trip_id = (SELECT trip_id FROM trip_attractions WHERE id = ?)',
+        (attr_id,)
+    ).fetchone()['count']
+    
+    # Jeśli ma <=50% głosów i była zatwierdzona, przywróć do propozycji
+    if members_count > 0 and (attraction.votes / members_count) <= 0.5:
+        if attraction._state.get_status_name() == "Zatwierdzone":
+            from states.proposedState import ProposedState
+            attraction.change_state(ProposedState())
+            repo.update_status(attr_id, attraction._state.get_status_name())  # Zapisz stan w bazie
+            print(f"⚠️ Atrakcja '{attraction.name}' przywrócona do propozycji ({attraction.votes}/{members_count} głosów)")
+    
     return jsonify(attraction.to_dict())
 
 @app.route('/api/schedule', methods=['GET'])
@@ -533,14 +563,22 @@ def add_trip_attraction(trip_id):
     name = data.get('name')
     type_ = data.get('type')
     note = data.get('note')
+    cost = data.get('cost', 0.0)  # Koszt atrakcji (domyślnie 0)
+    link = data.get('link')  # Opcjonalny link
     
     if not name:
         return jsonify({'status': 'error', 'message': 'name required'}), 400
     
+    # Konwertuj cost na float
+    try:
+        cost = float(cost) if cost else 0.0
+    except (ValueError, TypeError):
+        cost = 0.0
+    
     repo = AttractionRepository()
     
-    # Utwórz nową atrakcję
-    attraction = repo.create(trip_id, name, type_, note)
+    # Utwórz nową atrakcję z kosztem i linkiem
+    attraction = repo.create(trip_id, name, type_, note, cost, link)
     if not attraction:
         return jsonify({'status': 'error', 'message': 'Failed to create attraction'}), 500
     
@@ -549,6 +587,40 @@ def add_trip_attraction(trip_id):
     attractions_list = [a.to_dict() for a in attractions]
     
     return jsonify({'status': 'success', 'attractions': attractions_list}), 201
+
+@app.route('/api/trips/<int:trip_id>/attractions/<int:attraction_id>', methods=['DELETE'])
+def delete_trip_attraction(trip_id, attraction_id):
+    """Usuń atrakcję z wycieczki (tylko moderator)"""
+    data = request.json or {}
+    requester_id = data.get('requester_id')
+    
+    if not requester_id:
+        return jsonify({'status': 'error', 'message': 'requester_id required'}), 400
+    
+    conn = Database().get_connection()
+    
+    try:
+        # Sprawdź czy użytkownik jest moderatorem
+        member = conn.execute(
+            'SELECT role FROM trip_members WHERE trip_id = ? AND user_id = ?',
+            (trip_id, requester_id)
+        ).fetchone()
+        
+        if not member or member['role'] != 'moderator':
+            return jsonify({'status': 'error', 'message': 'Only moderator can delete attractions'}), 403
+        
+        # Usuń atrakcję
+        repo = AttractionRepository()
+        if not repo.delete(attraction_id):
+            return jsonify({'status': 'error', 'message': 'Attraction not found'}), 404
+        
+        # Zwróć zaktualizowaną listę atrakcji
+        attractions = repo.get_all_by_trip(trip_id)
+        attractions_list = [a.to_dict() for a in attractions]
+        return jsonify({'status': 'success', 'attractions': attractions_list}), 200
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/trips/<int:trip_id>/schedule', methods=['PUT'])
 def update_trip_schedule(trip_id):
@@ -580,6 +652,30 @@ def update_trip_schedule(trip_id):
         
         conn.commit()
         return jsonify({'status': 'success', 'message': 'Schedule saved'}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/trips/<int:trip_id>/user-votes', methods=['GET'])
+def get_user_votes(trip_id):
+    """Zwróć listę ID atrakcji, na które użytkownik zagłosował w danej wycieczce"""
+    user_id = request.args.get('user_id')
+    
+    if not user_id:
+        return jsonify({'status': 'error', 'message': 'user_id required'}), 400
+    
+    conn = Database().get_connection()
+    try:
+        # Pobierz wszystkie głosy użytkownika dla atrakcji z danej wycieczki
+        rows = conn.execute(
+            '''SELECT av.attraction_id 
+               FROM attraction_votes av
+               JOIN trip_attractions ta ON av.attraction_id = ta.id
+               WHERE ta.trip_id = ? AND av.user_id = ?''',
+            (trip_id, user_id)
+        ).fetchall()
+        
+        voted_ids = [row['attraction_id'] for row in rows]
+        return jsonify({'status': 'success', 'voted_attractions': voted_ids}), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 

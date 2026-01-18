@@ -12,9 +12,9 @@ export default function ScheduleBuilder({ trip, attractions }) {
     return Math.round((votes / trip.members.length) * 100);
   };
 
-  // Filtruj zatwierdzone atrakcje (>50%)
+  // Filtruj zatwierdzone atrakcje (używaj statusu z backendu)
   const approvedAttractions = attractions.filter(
-    a => getVotePercentage(a.votes) > 50
+    a => a.status === "Zatwierdzone"
   ).sort((a, b) => b.votes - a.votes);
 
   // Generuj listę dni wycieczki

@@ -8,6 +8,8 @@ import EditTripModal from './EditTripModal';
 
 export default function TripDetails({ selectedTrip, activeTab, setActiveTab, setSelectedTrip, handleVote, handleUnvote, togglePacking, addPackingItem, refreshTrip, userVotedAttractions }) {
   const [newAttractionName, setNewAttractionName] = useState('');
+  const [newAttractionCost, setNewAttractionCost] = useState('');
+  const [newAttractionLink, setNewAttractionLink] = useState('');
   const [addingAttraction, setAddingAttraction] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState(null);
   const [showAddMember, setShowAddMember] = useState(false);
@@ -30,12 +32,18 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
       const res = await fetch(`http://localhost:5001/api/trips/${selectedTrip.id}/attractions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ 
+          name,
+          cost: parseFloat(newAttractionCost) || 0,
+          link: newAttractionLink.trim() || null
+        })
       });
       
       if (res.ok) {
         const data = await res.json();
         setNewAttractionName('');
+        setNewAttractionCost('');
+        setNewAttractionLink('');
         // Odśwież trip aby pobrać zaktualizowaną listę atrakcji
         await refreshTrip(selectedTrip.id);
       }
@@ -135,6 +143,31 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
     }
   };
 
+  const handleDeleteAttraction = async (attractionId, attractionName) => {
+    if (!isModerator) return;
+    
+    if (!confirm(`Czy na pewno chcesz usunąć atrakcję "${attractionName}"?`)) return;
+    
+    try {
+      const res = await fetch(`http://localhost:5001/api/trips/${selectedTrip.id}/attractions/${attractionId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requester_id: currentUserId })
+      });
+      
+      if (res.ok) {
+        // Odśwież trip po usunięciu
+        await refreshTrip(selectedTrip.id);
+      } else {
+        const error = await res.json();
+        alert(error.message || 'Nie udało się usunąć atrakcji');
+      }
+    } catch (err) {
+      console.error('Nie udało się usunąć atrakcji', err);
+      alert('Wystąpił błąd podczas usuwania atrakcji');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Pasek nawigacji powrotu */}
@@ -165,6 +198,48 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
           </div>
         </div>
       </div>
+
+      {/* Podsumowanie Budżetu */}
+      {selectedTrip.budget_summary && (
+        <div className="bg-gradient-to-r from-green-50 to-blue-50 border-b px-8 py-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <div>
+                  <div className="text-sm text-gray-600 font-medium">Budżet całkowity</div>
+                  <div className="text-2xl font-bold text-gray-800">{selectedTrip.budget_summary.total_budget} PLN</div>
+                </div>
+                <div className="h-12 w-px bg-gray-300"></div>
+                <div>
+                  <div className="text-sm text-gray-600 font-medium">Wydane (zatwierdzone)</div>
+                  <div className="text-2xl font-bold text-green-600">{selectedTrip.budget_summary.spent} PLN</div>
+                </div>
+                <div className="h-12 w-px bg-gray-300"></div>
+                <div>
+                  <div className="text-sm text-gray-600 font-medium">Pozostało</div>
+                  <div className="text-2xl font-bold text-blue-600">{selectedTrip.budget_summary.remaining} PLN</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm text-gray-600 font-medium mb-1">Wykorzystanie</div>
+                <div className="flex items-center gap-3">
+                  <div className="w-48 h-3 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-500 ${
+                        selectedTrip.budget_summary.percentage_used > 90 ? 'bg-red-500' :
+                        selectedTrip.budget_summary.percentage_used > 70 ? 'bg-yellow-500' :
+                        'bg-green-500'
+                      }`}
+                      style={{ width: `${Math.min(selectedTrip.budget_summary.percentage_used, 100)}%` }}
+                    ></div>
+                  </div>
+                  <span className="text-lg font-bold text-gray-700">{selectedTrip.budget_summary.percentage_used}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 p-4 md:p-8 w-full">
         <div className="max-w-7xl mx-auto flex gap-6">
@@ -204,21 +279,39 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
               {/* Formularz do dodawania atrakcji */}
               <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <h3 className="font-semibold text-gray-800 mb-3">➕ Dodaj nową atrakcję</h3>
-                <div className="flex gap-2">
+                <div className="space-y-3">
                   <input
                     type="text"
                     value={newAttractionName}
                     onChange={e => setNewAttractionName(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') handleAddAttraction(); }}
-                    placeholder="np. Muzeum, Park, Restauracja..."
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-800"
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) handleAddAttraction(); }}
+                    placeholder="Nazwa atrakcji (np. Muzeum, Park, Restauracja...)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-800"
                   />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="number"
+                      value={newAttractionCost}
+                      onChange={e => setNewAttractionCost(e.target.value)}
+                      placeholder="Koszt (PLN)"
+                      step="0.01"
+                      min="0"
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-800"
+                    />
+                    <input
+                      type="url"
+                      value={newAttractionLink}
+                      onChange={e => setNewAttractionLink(e.target.value)}
+                      placeholder="Link (opcjonalnie)"
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-800"
+                    />
+                  </div>
                   <button
                     onClick={handleAddAttraction}
                     disabled={addingAttraction || !newAttractionName.trim()}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition disabled:bg-gray-400"
+                    className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition disabled:bg-gray-400"
                   >
-                    {addingAttraction ? 'Dodawanie...' : 'Dodaj'}
+                    {addingAttraction ? 'Dodawanie...' : 'Dodaj atrakcję'}
                   </button>
                 </div>
               </div>
@@ -231,6 +324,8 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
                 handleUnvote={handleUnvote}
                 tripId={selectedTrip.id}
                 userVotedAttractions={userVotedAttractions || []}
+                isModerator={isModerator}
+                onDeleteAttraction={handleDeleteAttraction}
               />
             </div>
           )}
