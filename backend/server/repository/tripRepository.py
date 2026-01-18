@@ -1,13 +1,14 @@
 from db.db import Database
 from entities.trip import Trip
-from entities.attraction import Attraction
 from entities.scheduleItem import ScheduleItem
 from entities.packingItem import PackingItem
+from repository.attractionRepository import AttractionRepository
 
 class TripRepository:
     def __init__(self):
         self.db = Database()
         self.conn = self.db.get_connection()
+        self.attraction_repo = AttractionRepository()
 
     def save(self, trip: Trip):
         cur = self.conn.cursor()
@@ -41,19 +42,11 @@ class TripRepository:
         if not trip_row:
             return None
         trip = Trip(trip_row['id'], trip_row['title'], trip_row['start_date'], trip_row['end_date'], trip_row['budget_limit'])
-        # load attractions with vote counts
-        rows = cur.execute('''
-            SELECT ta.id, ta.name, ta.type, ta.note, COUNT(av.id) as votes 
-            FROM trip_attractions ta 
-            LEFT JOIN attraction_votes av ON ta.id = av.attraction_id 
-            WHERE ta.trip_id=? 
-            GROUP BY ta.id 
-            ORDER BY ta.id
-        ''', (id,)).fetchall()
-        for r in rows:
-            a = Attraction(r['id'], r['name'], r['type'], r['note'])
-            a.votes = r['votes']
-            trip.attractions.append(a)
+        
+        # load attractions using AttractionRepository
+        attractions = self.attraction_repo.get_all_by_trip(id)
+        trip.attractions = attractions
+        
         # load members
         rows = cur.execute('SELECT tm.user_id, u.username, tm.role FROM trip_members tm JOIN users u ON u.id=tm.user_id WHERE tm.trip_id=?', (id,)).fetchall()
         for r in rows:

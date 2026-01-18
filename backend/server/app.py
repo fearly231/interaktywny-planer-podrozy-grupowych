@@ -8,6 +8,8 @@ from db.db import Database
 from entities.scheduleItem import ScheduleItem
 from entities.packingItem import PackingItem
 from repository.tripRepository import TripRepository
+from repository.attractionRepository import AttractionRepository
+from repository.userRepository import UserRepository
 from builder.tripBuilder import TripBuilder
 from entities.user import User
 
@@ -25,24 +27,23 @@ def login():
     username = data.get('username')
     password = data.get('password')
 
-    db = Database()
-    conn = db.get_connection()
+    repo = UserRepository()
     
     try:
-        # Wykonujemy zapytanie
-        user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        # Pobierz użytkownika
+        user = repo.get_by_username(username)
 
-        if user and user['password'] == password:
+        if user and repo.verify_password(username, password):
             # Generujemy token JWT
             token = jwt.encode({
-                'username': user['username'],
+                'username': user.username,
                 'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
             }, SECRET_KEY, algorithm='HS256')
             return jsonify({
                 "status": "success",
                 "token": token,
-                "user": user['username'],
-                "user_id": user['id']
+                "user": user.username,
+                "user_id": user.id
             }), 200
         else:
             return jsonify({"status": "error", "message": "Błędne dane logowania"}), 401
@@ -54,33 +55,50 @@ def register_user():
     data = request.json
     username = data.get('username')
     password = data.get('password')
+    
     if not username or not password:
         return jsonify({"status": "error", "message": "Brak nazwy użytkownika lub hasła"}), 400
-    db = Database()
-    conn = db.get_connection()
+    
+    repo = UserRepository()
+    
+    # Sprawdź czy użytkownik już istnieje
+    if repo.exists(username):
+        return jsonify({"status": "error", "message": "Użytkownik już istnieje"}), 409
+    
     try:
-        conn.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
-        conn.commit()
+        user = repo.create(username, password)
+        if user:
+            return jsonify({"status": "success", "user_id": user.id}), 201
+        else:
+            return jsonify({"status": "error", "message": "Nie udało się utworzyć użytkownika"}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-    return jsonify({"status": "success"}), 201
 
 @app.route('/api/users/check', methods=['POST'])
 def check_user_exists():
     """Sprawdź czy użytkownik istnieje w bazie danych"""
     data = request.json or {}
     username = data.get('username')
+    
     if not username:
         return jsonify({"status": "error", "message": "username required"}), 400
     
-    db = Database()
-    conn = db.get_connection()
+    repo = UserRepository()
+    
     try:
-        user = conn.execute('SELECT id, username FROM users WHERE username = ?', (username,)).fetchone()
+        user = repo.get_by_username(username)
         if user:
-            return jsonify({"status": "success", "exists": True, "username": user['username']}), 200
+            return jsonify({
+                "status": "success", 
+                "exists": True, 
+                "username": user.username
+            }), 200
         else:
-            return jsonify({"status": "error", "exists": False, "message": f"Użytkownik '{username}' nie istnieje w systemie"}), 404
+            return jsonify({
+                "status": "error", 
+                "exists": False, 
+                "message": f"Użytkownik '{username}' nie istnieje w systemie"
+            }), 404
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -129,49 +147,23 @@ def vote_attraction(attr_id):
     if not user_id:
         return jsonify({"error": "user_id required"}), 400
     
-    conn = Database().get_connection()
-    try:
-        # Sprawdź czy atrakcja istnieje
-        attraction = conn.execute(
-            'SELECT id, trip_id, name, type, note FROM trip_attractions WHERE id = ?',
-            (attr_id,)
-        ).fetchone()
-        
-        if not attraction:
-            return jsonify({"error": "Nie znaleziono atrakcji"}), 404
-        
-        # Sprawdź czy użytkownik już głosował
-        existing_vote = conn.execute(
-            'SELECT id FROM attraction_votes WHERE attraction_id = ? AND user_id = ?',
-            (attr_id, user_id)
-        ).fetchone()
-        
-        if existing_vote:
-            return jsonify({"error": "Już głosowałeś na tę atrakcję"}), 409
-        
-        # Dodaj nowy głos
-        conn.execute(
-            'INSERT INTO attraction_votes (attraction_id, user_id) VALUES (?, ?)',
-            (attr_id, user_id)
-        )
-        conn.commit()
-        
-        # Pobierz liczę głosów
-        vote_count = conn.execute(
-            'SELECT COUNT(*) as votes FROM attraction_votes WHERE attraction_id = ?',
-            (attr_id,)
-        ).fetchone()['votes']
-        
-        # Zwróć zaktualizowaną atrakcję
-        return jsonify({
-            "id": attraction['id'],
-            "name": attraction['name'],
-            "type": attraction['type'],
-            "note": attraction['note'],
-            "votes": vote_count
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    repo = AttractionRepository()
+    
+    # Pobierz atrakcję
+    attraction = repo.get_by_id(attr_id)
+    if not attraction:
+        return jsonify({"error": "Nie znaleziono atrakcji"}), 404
+    
+    # Dodaj głos
+    if not repo.add_vote(attr_id, user_id):
+        return jsonify({"error": "Już głosowałeś na tę atrakcję"}), 409
+    
+    # Wykonaj logikę biznesową na encji
+    attraction.vote_up()
+    
+    # Pobierz zaktualizowaną atrakcję z nowymi głosami
+    attraction = repo.get_by_id(attr_id)
+    return jsonify(attraction.to_dict())
 
 @app.route('/api/attractions/<int:attr_id>/vote', methods=['DELETE'])
 def unvote_attraction(attr_id):
@@ -182,49 +174,20 @@ def unvote_attraction(attr_id):
     if not user_id:
         return jsonify({"error": "user_id required"}), 400
     
-    conn = Database().get_connection()
-    try:
-        # Sprawdź czy atrakcja istnieje
-        attraction = conn.execute(
-            'SELECT id, trip_id, name, type, note FROM trip_attractions WHERE id = ?',
-            (attr_id,)
-        ).fetchone()
-        
-        if not attraction:
-            return jsonify({"error": "Nie znaleziono atrakcji"}), 404
-        
-        # Sprawdź czy użytkownik głosował
-        existing_vote = conn.execute(
-            'SELECT id FROM attraction_votes WHERE attraction_id = ? AND user_id = ?',
-            (attr_id, user_id)
-        ).fetchone()
-        
-        if not existing_vote:
-            return jsonify({"error": "Nie głosowałeś na tę atrakcję"}), 404
-        
-        # Usuń głos
-        conn.execute(
-            'DELETE FROM attraction_votes WHERE attraction_id = ? AND user_id = ?',
-            (attr_id, user_id)
-        )
-        conn.commit()
-        
-        # Pobierz zaktualizowaną liczbę głosów
-        vote_count = conn.execute(
-            'SELECT COUNT(*) as votes FROM attraction_votes WHERE attraction_id = ?',
-            (attr_id,)
-        ).fetchone()['votes']
-        
-        # Zwróć zaktualizowaną atrakcję
-        return jsonify({
-            "id": attraction['id'],
-            "name": attraction['name'],
-            "type": attraction['type'],
-            "note": attraction['note'],
-            "votes": vote_count
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    repo = AttractionRepository()
+    
+    # Pobierz atrakcję
+    attraction = repo.get_by_id(attr_id)
+    if not attraction:
+        return jsonify({"error": "Nie znaleziono atrakcji"}), 404
+    
+    # Usuń głos
+    if not repo.remove_vote(attr_id, user_id):
+        return jsonify({"error": "Nie głosowałeś na tę atrakcję"}), 404
+    
+    # Pobierz zaktualizowaną atrakcję z nowymi głosami
+    attraction = repo.get_by_id(attr_id)
+    return jsonify(attraction.to_dict())
 
 @app.route('/api/schedule', methods=['GET'])
 def get_schedule():
@@ -570,25 +533,22 @@ def add_trip_attraction(trip_id):
     name = data.get('name')
     type_ = data.get('type')
     note = data.get('note')
+    
     if not name:
         return jsonify({'status': 'error', 'message': 'name required'}), 400
-    conn = Database().get_connection()
-    try:
-        conn.execute('INSERT INTO trip_attractions (trip_id, name, type, note) VALUES (?, ?, ?, ?)', (trip_id, name, type_, note))
-        conn.commit()
-        # Pobierz zaktualizowaną listę atrakcji dla tego tripa z liczbą głosów
-        attractions = conn.execute(
-            '''SELECT ta.id, ta.trip_id, ta.name, ta.type, ta.note, COUNT(av.id) as votes 
-               FROM trip_attractions ta 
-               LEFT JOIN attraction_votes av ON ta.id = av.attraction_id 
-               WHERE ta.trip_id = ? 
-               GROUP BY ta.id''',
-            (trip_id,)
-        ).fetchall()
-        attractions_list = [dict(a) for a in attractions] if attractions else []
-        return jsonify({'status': 'success', 'attractions': attractions_list}), 201
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    
+    repo = AttractionRepository()
+    
+    # Utwórz nową atrakcję
+    attraction = repo.create(trip_id, name, type_, note)
+    if not attraction:
+        return jsonify({'status': 'error', 'message': 'Failed to create attraction'}), 500
+    
+    # Pobierz wszystkie atrakcje dla tej wycieczki
+    attractions = repo.get_all_by_trip(trip_id)
+    attractions_list = [a.to_dict() for a in attractions]
+    
+    return jsonify({'status': 'success', 'attractions': attractions_list}), 201
 
 @app.route('/api/trips/<int:trip_id>/schedule', methods=['PUT'])
 def update_trip_schedule(trip_id):
