@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ChatWidget({ tripId }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -101,96 +102,132 @@ export default function ChatWidget({ tripId }) {
   return (
     <div className="fixed bottom-6 right-6 z-50">
       {/* Rozwinięty czat */}
-      {isOpen && (
-        <div className="bg-white rounded-lg shadow-2xl w-96 h-[500px] flex flex-col mb-4 border border-gray-200">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 rounded-t-lg flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">💬</span>
-              <span className="font-semibold">Czat wycieczki</span>
-            </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="hover:bg-blue-800 rounded-full p-1 transition"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-            {loading && messages.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                Ładowanie wiadomości...
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="bg-white rounded-lg shadow-2xl w-96 h-[500px] flex flex-col mb-4 border border-gray-200"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 rounded-t-lg flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">💬</span>
+                <span className="font-semibold">Czat wycieczki</span>
               </div>
-            ) : messages.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                Brak wiadomości. Napisz pierwszą!
-              </div>
-            ) : (
-              messages.map((msg) => {
-                const isOwnMessage = msg.user_id === currentUserId;
-                return (
-                  <div
-                    key={msg.id}
-                    className={`flex gap-2 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}
-                  >
-                    {/* Avatar */}
-                    <div className={`${getAvatarColor(msg.username)} w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
-                      {msg.username.charAt(0).toUpperCase()}
-                    </div>
-
-                    {/* Message bubble */}
-                    <div className={`max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col`}>
-                      <div className={`${isOwnMessage ? 'bg-blue-600 text-white' : 'bg-white text-gray-800'} px-3 py-2 rounded-lg shadow-sm`}>
-                        {!isOwnMessage && (
-                          <div className="text-xs font-semibold mb-1 text-gray-600">
-                            {msg.username}
-                          </div>
-                        )}
-                        <div className="text-sm break-words">{msg.message}</div>
-                      </div>
-                      <div className={`text-xs text-gray-500 mt-1 px-1 ${isOwnMessage ? 'text-right' : 'text-left'}`}>
-                        {formatTime(msg.timestamp)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input */}
-          <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-gray-200 rounded-b-lg">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Napisz wiadomość..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-black"
-                disabled={sending}
-              />
               <button
-                type="submit"
-                disabled={!newMessage.trim() || sending}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-semibold transition flex items-center gap-1"
+                onClick={() => setIsOpen(false)}
+                className="hover:bg-blue-800 rounded-full p-1 transition"
               >
-                {sending ? '...' : '📤'}
+                ✕
               </button>
             </div>
-          </form>
-        </div>
-      )}
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+              {loading && messages.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  Ładowanie wiadomości...
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  Brak wiadomości. Napisz pierwszą!
+                </div>
+              ) : (
+                messages.map((msg, index) => {
+                  const isOwnMessage = msg.user_id === currentUserId;
+                  return (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: index * 0.03 }}
+                      className={`flex gap-2 ${isOwnMessage ? 'flex-row-reverse' : 'flex-row'}`}
+                    >
+                      {/* Avatar */}
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ duration: 0.2, delay: index * 0.03 + 0.1 }}
+                        className={`${getAvatarColor(msg.username)} w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}
+                      >
+                        {msg.username.charAt(0).toUpperCase()}
+                      </motion.div>
+
+                      {/* Message bubble */}
+                      <div className={`max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col`}>
+                        <motion.div
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ duration: 0.2, delay: index * 0.03 + 0.05 }}
+                          className={`${isOwnMessage ? 'bg-blue-600 text-white' : 'bg-white text-gray-800'} px-3 py-2 rounded-lg shadow-sm`}
+                        >
+                          {!isOwnMessage && (
+                            <div className="text-xs font-semibold mb-1 text-gray-600">
+                              {msg.username}
+                            </div>
+                          )}
+                          <div className="text-sm break-words">{msg.message}</div>
+                        </motion.div>
+                        <div className={`text-xs text-gray-500 mt-1 px-1 ${isOwnMessage ? 'text-right' : 'text-left'}`}>
+                          {formatTime(msg.timestamp)}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input */}
+            <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-gray-200 rounded-b-lg">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Napisz wiadomość..."
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-black"
+                  disabled={sending}
+                />
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  type="submit"
+                  disabled={!newMessage.trim() || sending}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-semibold transition flex items-center gap-1"
+                >
+                  {sending ? '...' : '📤'}
+                </motion.button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Floating button */}
-      <button
+      <motion.button
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 260, damping: 20 }}
         onClick={() => setIsOpen(!isOpen)}
         className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white w-14 h-14 rounded-full shadow-xl hover:shadow-2xl transition-all flex items-center justify-center text-2xl"
       >
-        {isOpen ? '✕' : '💬'}
-      </button>
+        <motion.span
+          key={isOpen ? 'close' : 'open'}
+          initial={{ rotate: -180, opacity: 0 }}
+          animate={{ rotate: 0, opacity: 1 }}
+          exit={{ rotate: 180, opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          {isOpen ? '✕' : '💬'}
+        </motion.span>
+      </motion.button>
     </div>
   );
 }

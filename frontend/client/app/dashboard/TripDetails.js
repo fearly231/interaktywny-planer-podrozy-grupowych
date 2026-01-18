@@ -376,7 +376,7 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
               )}
 
               {selectedTrip.members && selectedTrip.members.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                   {[...selectedTrip.members]
                     .sort((a, b) => {
                       // Moderatorzy na górze
