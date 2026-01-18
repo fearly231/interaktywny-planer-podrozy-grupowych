@@ -479,6 +479,70 @@ def update_trip(trip_id):
         # Zwróć zaktualizowaną wycieczkę
         repo = TripRepository()
         trip = repo.get_by_id(trip_id)
+        
+        if trip:
+            return jsonify({'status': 'success', 'trip': trip.to_dict()}), 200
+        else:
+            return jsonify({'status': 'error', 'message': 'Trip not found'}), 404
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/trips/<int:trip_id>', methods=['DELETE'])
+def delete_trip(trip_id):
+    """Usuń wycieczkę - tylko moderator"""
+    data = request.json or {}
+    requester_id = data.get('requester_id')
+    
+    if not requester_id:
+        return jsonify({'status': 'error', 'message': 'requester_id required'}), 400
+    
+    conn = Database().get_connection()
+    
+    try:
+        # Sprawdź czy użytkownik jest moderatorem
+        member = conn.execute(
+            'SELECT role FROM trip_members WHERE trip_id = ? AND user_id = ?',
+            (trip_id, requester_id)
+        ).fetchone()
+        
+        if not member or member['role'] != 'moderator':
+            return jsonify({'status': 'error', 'message': 'Only moderator can delete trip'}), 403
+        
+        # Usuń powiązane dane w odpowiedniej kolejności
+        # 1. Usuń głosy na atrakcje
+        conn.execute(
+            '''DELETE FROM attraction_votes 
+               WHERE attraction_id IN (SELECT id FROM trip_attractions WHERE trip_id = ?)''',
+            (trip_id,)
+        )
+        
+        # 2. Usuń atrakcje
+        conn.execute('DELETE FROM trip_attractions WHERE trip_id = ?', (trip_id,))
+        
+        # 3. Usuń wiadomości czatu
+        conn.execute('DELETE FROM chat_messages WHERE trip_id = ?', (trip_id,))
+        
+        # 4. Usuń listę pakowania
+        conn.execute('DELETE FROM packing_items WHERE trip_id = ?', (trip_id,))
+        
+        # 5. Usuń harmonogram
+        conn.execute('DELETE FROM schedule_items WHERE trip_id = ?', (trip_id,))
+        
+        # 6. Usuń członków
+        conn.execute('DELETE FROM trip_members WHERE trip_id = ?', (trip_id,))
+        
+        # 7. Usuń samą wycieczkę
+        conn.execute('DELETE FROM trips WHERE id = ?', (trip_id,))
+        
+        conn.commit()
+        
+        return jsonify({'status': 'success', 'message': 'Trip deleted successfully'}), 200
+            
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+        trip = repo.get_by_id(trip_id)
         return jsonify(trip.to_dict()), 200
         
     except Exception as e:

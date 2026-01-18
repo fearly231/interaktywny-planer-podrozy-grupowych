@@ -426,6 +426,7 @@ export default function Dashboard() {
           addPackingItem={addPackingItem}
           refreshTrip={refreshTrip}
           userVotedAttractions={userVotedAttractions}
+          onTripDeleted={loadTrips}
         />
       </div>
     </>

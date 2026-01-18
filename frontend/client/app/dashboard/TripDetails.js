@@ -5,9 +5,10 @@ import AttractionsVoting from './AttractionsVoting';
 import ScheduleBuilder from './ScheduleBuilder';
 import Schedule from './Schedule';
 import EditTripModal from './EditTripModal';
+import DeleteTripModal from './DeleteTripModal';
 import ChatWidget from './ChatWidget';
 
-export default function TripDetails({ selectedTrip, activeTab, setActiveTab, setSelectedTrip, handleVote, handleUnvote, togglePacking, addPackingItem, refreshTrip, userVotedAttractions }) {
+export default function TripDetails({ selectedTrip, activeTab, setActiveTab, setSelectedTrip, handleVote, handleUnvote, togglePacking, addPackingItem, refreshTrip, userVotedAttractions, onTripDeleted }) {
   const [newAttractionName, setNewAttractionName] = useState('');
   const [newAttractionCost, setNewAttractionCost] = useState('');
   const [newAttractionLink, setNewAttractionLink] = useState('');
@@ -17,6 +18,7 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
   const [newMemberUsername, setNewMemberUsername] = useState('');
   const [addingMember, setAddingMember] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   if (!selectedTrip) return null;
 
@@ -144,6 +146,32 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
     }
   };
 
+  const handleDeleteTrip = async () => {
+    try {
+      const res = await fetch(`http://localhost:5001/api/trips/${selectedTrip.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requester_id: currentUserId })
+      });
+      
+      if (res.ok) {
+        // Odśwież listę wycieczek
+        if (onTripDeleted) {
+          await onTripDeleted();
+        }
+        // Wróć do listy wycieczek
+        setSelectedTrip(null);
+        setActiveTab('harmonogram');
+      } else {
+        const error = await res.json();
+        alert(error.message || 'Nie udało się usunąć wycieczki');
+      }
+    } catch (err) {
+      console.error('Nie udało się usunąć wycieczki', err);
+      alert('Wystąpił błąd podczas usuwania wycieczki');
+    }
+  };
+
   const handleDeleteAttraction = async (attractionId, attractionName) => {
     if (!isModerator) return;
     
@@ -187,12 +215,20 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
         </div>
         <div className="flex items-center gap-4">
           {isModerator && (
-            <button
-              onClick={() => setShowEditModal(true)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition flex items-center gap-2"
-            >
-              ✏️ Edytuj
-            </button>
+            <>
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition flex items-center gap-2"
+              >
+                ✏️ Edytuj
+              </button>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition flex items-center gap-2"
+              >
+                🗑️ Usuń
+              </button>
+            </>
           )}
           <div className="text-sm text-gray-500 font-medium">
             {selectedTrip.start_date} - {selectedTrip.end_date}
@@ -427,6 +463,15 @@ export default function TripDetails({ selectedTrip, activeTab, setActiveTab, set
           trip={selectedTrip}
           onClose={() => setShowEditModal(false)}
           onSave={handleEditTrip}
+        />
+      )}
+
+      {/* Modal usuwania wycieczki */}
+      {showDeleteModal && (
+        <DeleteTripModal
+          trip={selectedTrip}
+          onClose={() => setShowDeleteModal(false)}
+          onDelete={handleDeleteTrip}
         />
       )}
 
